@@ -11,11 +11,6 @@ How to - https://www.youtube.com/watch?v=plZyfU9T70Q
 - ChromeDriver version 137.0.7151.68
 - Windows 10/11 (64-bit)
 
-## Quick Start
-
-1. Click the "Open in Streamlit" button above to use the application directly in your browser
-2. No installation required - just enter a website URL and start scraping!
-
 ## Features
 
 - **PDF Scraping**: Automatically finds and downloads PDF files from websites
