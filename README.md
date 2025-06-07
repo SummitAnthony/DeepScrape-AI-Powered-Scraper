@@ -2,6 +2,8 @@
 
 A powerful web application that combines web scraping with AI analysis to extract and process PDF documents from websites.
 
+How to - https://www.youtube.com/watch?v=plZyfU9T70Q
+
 ## System Requirements
 
 - Python 3.8 or higher
