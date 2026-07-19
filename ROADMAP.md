@@ -2,11 +2,13 @@
 
 One item per iteration. Implement minimally, verify, commit, push, check off.
 
-## Queue (priority order) — Round 2 (TDD: write tests first, make them pass, then ship)
+## Queue (priority order)
 
-- [ ] **Watch mode**: monitor a URL on interval, diff text content between runs, show what changed. TDD: diff/normalize tests first.
+(empty — rounds 1 and 2 fully shipped)
 
 ## Done
+
+- [x] **Watch mode**: SQLite snapshots + line diffs + Watch Page UI (11 tests) — `dbd553c`
 
 - [x] **Smart crawl**: goal-directed link ranking via LLM (10 tests) — `9695f8c`
 - [x] **Playwright migration**: Selenium fully removed, live fetch verified (6 tests) — `3da8eb9`
