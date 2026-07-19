@@ -106,6 +106,23 @@ def rate_limit():
     delay = RATE_LIMIT_DELAY + random.uniform(0, 1)
     time.sleep(delay)
 
+def fetch_html(url, timeout=15):
+    """Fetch page HTML with plain requests (fast path).
+    Returns HTML string, or None if the caller should fall back to Selenium."""
+    try:
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        response.raise_for_status()
+        if 'html' not in response.headers.get('Content-Type', '').lower():
+            return None
+        return response.text
+    except Exception as e:
+        logger.info(f"requests fetch failed ({e}); falling back to Selenium")
+        return None
+
 def create_download_folder(base_folder="downloads"):
     """Create the download folder if it doesn't exist"""
     try:
@@ -200,128 +217,73 @@ def get_filename_from_url(url, response):
         logger.error(f"Error getting filename: {str(e)}")
         return f"error_{hash(url)}.pdf"
 
+def get_page_html(website):
+    """Get page HTML: plain requests first, headless Selenium fallback for JS-heavy pages."""
+    html = fetch_html(website)
+    if html is not None:
+        logger.info("Fetched page via requests (fast path)")
+        return html
+
+    # Selenium fallback
+    chrome_version = get_chrome_version()
+    if not chrome_version:
+        raise Exception("Could not determine Chrome version. Please ensure Chrome is installed.")
+
+    if not verify_chromedriver():
+        raise Exception("ChromeDriver verification failed. Please ensure you have the correct 64-bit version installed.")
+
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument(f"user-agent={get_random_user_agent()}")
+    options.add_argument("--window-size=1920,1080")
+
+    logger.info("Initializing headless Chrome driver...")
+    try:
+        chrome_driver_path = os.path.join(os.getcwd(), "chromedriver.exe")
+        if not os.path.exists(chrome_driver_path):
+            raise Exception(f"ChromeDriver not found at: {chrome_driver_path}")
+        service = ChromeService(executable_path=chrome_driver_path)
+        driver = webdriver.Chrome(service=service, options=options)
+    except Exception as e:
+        if "This version of ChromeDriver only supports Chrome version" in str(e):
+            logger.error(f"ChromeDriver version mismatch. Your Chrome version is {chrome_version}. "
+                         "Download the matching driver from https://googlechromelabs.github.io/chrome-for-testing/")
+        raise
+
+    try:
+        driver.get(website)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        time.sleep(2)  # let dynamic content load
+        return driver.page_source
+    finally:
+        driver.quit()
+
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def scrape_website(website):
-    """Scrape website for PDF download links"""
+    """Scrape website for PDF download links (requests first, Selenium fallback)"""
     try:
-        logger.info("="*50)
         logger.info(f"Starting scraping process for: {website}")
-        logger.info("="*50)
-        
-        # Get Chrome version
-        chrome_version = get_chrome_version()
-        if not chrome_version:
-            raise Exception("Could not determine Chrome version. Please ensure Chrome is installed.")
-        logger.info(f"Detected Chrome version: {chrome_version}")
-        
-        # Verify ChromeDriver before starting
-        if not verify_chromedriver():
-            raise Exception("ChromeDriver verification failed. Please ensure you have the correct 64-bit version installed.")
-        
-        logger.info("Launching chrome browser...")
-        download_folder = create_download_folder()
-
-        options = webdriver.ChromeOptions()
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        # options.add_argument("--headless=new")  # Commented out for debugging
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-software-rasterizer")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument(f"user-agent={get_random_user_agent()}")
-        options.add_argument("--disable-features=IsolateOrigins,site-per-process")
-        options.add_argument("--disable-site-isolation-trials")
-        
-        # Add window size for visible mode
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--start-maximized")
-        
-        logger.info("Initializing Chrome driver...")
-        try:
-            # Use local ChromeDriver
-            chrome_driver_path = os.path.join(os.getcwd(), "chromedriver.exe")
-            if not os.path.exists(chrome_driver_path):
-                raise Exception(f"ChromeDriver not found at: {chrome_driver_path}")
-            
-            service = ChromeService(executable_path=chrome_driver_path)
-            driver = webdriver.Chrome(service=service, options=options)
-            driver.set_window_size(1920, 1080)
-            logger.info("Chrome driver initialized successfully")
-        except Exception as e:
-            error_msg = str(e)
-            if "This version of ChromeDriver only supports Chrome version" in error_msg:
-                logger.error(f"ChromeDriver version mismatch. Your Chrome version is {chrome_version}")
-                logger.error("Please download the correct ChromeDriver version from:")
-                logger.error("https://googlechromelabs.github.io/chrome-for-testing/")
-                logger.error(f"Look for version {chrome_version}")
-                logger.error("After downloading:")
-                logger.error("1. Extract the chromedriver.exe file")
-                logger.error("2. Replace the existing chromedriver.exe in your project directory")
-                logger.error("3. Make sure it's the 64-bit version")
-            raise
+        html = get_page_html(website)
+        soup = BeautifulSoup(html, 'html.parser')
 
         download_links = set()
-        
-        try:
-            logger.info(f"Accessing URL: {website}")
-            driver.get(website)
-            
-            # Wait for the page to load
-            logger.info("Waiting for page to load...")
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            logger.info("Page loaded successfully")
-            
-            # Get page source and parse with BeautifulSoup
-            logger.info("Parsing page content...")
-            html = driver.page_source
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            # Find all links
-            links = soup.find_all('a', href=True)
-            logger.info(f"Found {len(links)} total links on page")
-            
-            # Process each link
-            for link in links:
-                href = link.get('href')
-                if href:
-                    href = get_absolute_url(website, href)
-                    if not href:
-                        continue
-                        
-                    logger.info(f"Processing link: {href}")
-                    
-                    # Check if it's a download link
-                    if is_download_link(href):
-                        logger.info(f"✅ Found PDF download link: {href}")
-                        download_links.add(href)
-                    else:
-                        logger.info(f"⏭️ Skipping non-PDF link: {href}")
-            
-            # Also check for download links in the page content
-            logger.info("Checking page content for additional PDF links...")
-            download_elements = driver.find_elements(By.XPATH, "//*[contains(@href, 'download') or contains(@href, '.pdf')]")
-            for element in download_elements:
-                href = element.get_attribute('href')
-                if href:
-                    href = get_absolute_url(website, href)
-                    if href:
-                        logger.info(f"✅ Found PDF link from element: {href}")
-                        download_links.add(href)
-            
-            logger.info(f"Scraping completed. Found {len(download_links)} PDF links")
-            return list(download_links)
-            
-        except Exception as e:
-            logger.error(f"An error occurred during scraping: {str(e)}")
-            raise
-        finally:
-            driver.quit()
-            logger.info("Browser closed.")
-            
+        # Any element with an href (not just <a>) that looks like a PDF/download link
+        for element in soup.find_all(href=True):
+            href = get_absolute_url(website, element.get('href'))
+            if href and is_download_link(href):
+                download_links.add(href)
+
+        logger.info(f"Scraping completed. Found {len(download_links)} PDF links")
+        return list(download_links)
+
     except Exception as e:
         logger.error(f"Critical error in scrape_website: {str(e)}")
         raise
@@ -412,90 +374,59 @@ def scrape_website_content(url):
     """
     try:
         logger.info(f"Starting website content scraping for: {url}")
-        
-        options = webdriver.ChromeOptions()
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        # options.add_argument("--headless=new")  # Commented out headless mode
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-software-rasterizer")
-        options.add_argument(f"user-agent={get_random_user_agent()}")
-        
-        try:
-            service = ChromeService(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=options)
-        except Exception as e:
-            logger.error(f"Failed to initialize Chrome driver: {str(e)}")
-            raise
-        
-        try:
-            driver.get(url)
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            
-            # Add a small delay to let dynamic content load
-            time.sleep(2)
-            
-            # Get page source and parse with BeautifulSoup
-            html = driver.page_source
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            # Extract structured data
-            data = {
-                'title': soup.title.string if soup.title else '',
-                'headings': [],
-                'paragraphs': [],
-                'images': [],
-                'links': [],
-                'metadata': {
-                    'url': url,
-                    'scraped_date': datetime.now().isoformat(),
-                    'user_agent': get_random_user_agent()
-                }
+
+        html = get_page_html(url)
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # Extract structured data
+        data = {
+            'title': soup.title.string if soup.title else '',
+            'headings': [],
+            'paragraphs': [],
+            'images': [],
+            'links': [],
+            'metadata': {
+                'url': url,
+                'scraped_date': datetime.now().isoformat(),
+                'user_agent': get_random_user_agent()
             }
-            
-            # Extract headings
-            for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
-                data['headings'].append({
-                    'level': heading.name,
-                    'text': heading.get_text(strip=True)
+        }
+        
+        # Extract headings
+        for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+            data['headings'].append({
+                'level': heading.name,
+                'text': heading.get_text(strip=True)
+            })
+        
+        # Extract paragraphs
+        for p in soup.find_all('p'):
+            text = p.get_text(strip=True)
+            if text:
+                data['paragraphs'].append(text)
+        
+        # Extract images
+        for img in soup.find_all('img'):
+            src = img.get('src', '')
+            alt = img.get('alt', '')
+            if src:
+                data['images'].append({
+                    'src': get_absolute_url(url, src),
+                    'alt': alt
                 })
-            
-            # Extract paragraphs
-            for p in soup.find_all('p'):
-                text = p.get_text(strip=True)
-                if text:
-                    data['paragraphs'].append(text)
-            
-            # Extract images with rate limiting
-            for img in soup.find_all('img'):
-                src = img.get('src', '')
-                alt = img.get('alt', '')
-                if src:
-                    rate_limit()  # Add delay between image processing
-                    data['images'].append({
-                        'src': get_absolute_url(url, src),
-                        'alt': alt
-                    })
-            
-            # Extract links
-            for a in soup.find_all('a', href=True):
-                href = a.get('href')
-                text = a.get_text(strip=True)
-                if href:
-                    data['links'].append({
-                        'url': get_absolute_url(url, href),
-                        'text': text
-                    })
-            
-            return data
-            
-        finally:
-            driver.quit()
-            
+        
+        # Extract links
+        for a in soup.find_all('a', href=True):
+            href = a.get('href')
+            text = a.get_text(strip=True)
+            if href:
+                data['links'].append({
+                    'url': get_absolute_url(url, href),
+                    'text': text
+                })
+        
+        return data
+
     except Exception as e:
         logger.error(f"Error in scrape_website_content: {str(e)}")
         raise
