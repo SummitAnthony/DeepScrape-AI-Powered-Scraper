@@ -14,6 +14,7 @@ from rag import index_pdfs, retrieve, build_rag_prompt, DEFAULT_EMBED_MODEL
 from watch import check_url
 from history import log_job, list_jobs
 from vision import screenshot_page, analyze_image, DEFAULT_VISION_MODEL
+from conversation import Conversation
 import time
 import os
 import base64
@@ -718,7 +719,7 @@ Provide a clear, well-formatted response that directly addresses the user's requ
     if st.session_state.downloaded_pdfs:
         st.markdown("### 💬 Chat with Your PDFs")
         if 'pdf_chat' not in st.session_state:
-            st.session_state.pdf_chat = []
+            st.session_state.pdf_chat = Conversation()
 
         if st.button("Index PDFs for chat"):
             try:
@@ -734,8 +735,10 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                 st.error(f"Indexing failed: {str(e)}. Embeddings need the '{DEFAULT_EMBED_MODEL}' model — run: ollama pull {DEFAULT_EMBED_MODEL}")
                 logger.error(f"RAG indexing error: {str(e)}")
 
+        conv = st.session_state.pdf_chat
+
         # Chat history
-        for msg in st.session_state.pdf_chat:
+        for msg in conv.as_list():
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
@@ -743,20 +746,22 @@ Provide a clear, well-formatted response that directly addresses the user's requ
             rag_question = st.text_input("Ask a question about your indexed PDFs",
                                          placeholder="e.g. What are the key findings across these papers?")
             if st.form_submit_button("Ask") and rag_question.strip():
-                st.session_state.pdf_chat.append({"role": "user", "content": rag_question})
                 try:
                     retrieved = retrieve(rag_question)
                     if not retrieved:
-                        answer = "No indexed content found — click 'Index PDFs for chat' first."
-                        st.info(answer)
+                        st.info("No indexed content found — click 'Index PDFs for chat' first.")
                     else:
-                        prompt = build_rag_prompt(rag_question, retrieved, st.session_state.pdf_chat[:-1])
+                        # History (budget-trimmed) is everything so far, before this question
+                        history = conv.as_list()
+                        prompt = build_rag_prompt(rag_question, retrieved, history)
+                        with st.chat_message("user"):
+                            st.markdown(rag_question)
                         with st.chat_message("assistant"):
                             answer = st.write_stream(stream_generate(prompt, st.session_state.get('ollama_model')))
                             st.caption("Sources: " + ", ".join(sorted({doc for doc, _, _ in retrieved})))
-                    st.session_state.pdf_chat.append({"role": "assistant", "content": answer})
+                        conv.add_user(rag_question)
+                        conv.add_assistant(answer)
                 except Exception as e:
-                    st.session_state.pdf_chat.pop()  # drop the unanswered question
                     st.error(f"Chat failed: {str(e)}")
                     logger.error(f"RAG chat error: {str(e)}")
 

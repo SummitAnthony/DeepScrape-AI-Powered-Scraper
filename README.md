@@ -34,6 +34,7 @@ No separate Chrome/ChromeDriver install needed — Playwright manages its own he
 - **AI Analysis**: Ask anything about scraped content or downloaded PDFs (requires Ollama)
   - Streaming responses render live as they're generated
   - Large content is automatically chunked and analyzed map-reduce style
+  - Multi-turn memory: PDF chat remembers earlier questions (budget-trimmed) so follow-ups keep context
   - Pick any locally installed Ollama model from the sidebar
 - **Visual Analysis**: Screenshot a full page and analyze it with a vision model (llava) — reads charts, images, and layout that text scraping misses
 - **Structured Extraction**: Give a list of fields (e.g. `name, price, date`) and get a table with CSV/JSON export
