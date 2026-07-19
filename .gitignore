@@ -47,3 +47,6 @@ geckodriver.exe
 .ipynb_checkpoints 
 # Page cache
 .page_cache/
+
+# RAG index
+rag_index.db

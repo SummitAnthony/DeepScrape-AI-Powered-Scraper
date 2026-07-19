@@ -10,6 +10,7 @@ from parse import (
     sync_extract_pdf_text,
     MAX_CONTENT_CHARS,
 )
+from rag import index_pdfs, retrieve, build_rag_prompt, DEFAULT_EMBED_MODEL
 import time
 import os
 import base64
@@ -625,6 +626,52 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                     except Exception as e:
                         st.error(f"Error analyzing PDFs: {str(e)}")
                         logger.error(f"PDF analysis error: {str(e)}")
+
+    # RAG chat: index PDFs once, then ask questions with cited answers
+    if st.session_state.downloaded_pdfs:
+        st.markdown("### 💬 Chat with Your PDFs")
+        if 'pdf_chat' not in st.session_state:
+            st.session_state.pdf_chat = []
+
+        if st.button("Index PDFs for chat"):
+            try:
+                index_status = st.empty()
+
+                def show_index_progress(done, total):
+                    index_status.text(f"Indexing PDF {done} of {total} (extract → chunk → embed)...")
+
+                n_chunks = index_pdfs(st.session_state.downloaded_pdfs, progress_callback=show_index_progress)
+                index_status.empty()
+                st.success(f"Indexed {n_chunks} chunks from {len(st.session_state.downloaded_pdfs)} PDF(s)")
+            except Exception as e:
+                st.error(f"Indexing failed: {str(e)}. Embeddings need the '{DEFAULT_EMBED_MODEL}' model — run: ollama pull {DEFAULT_EMBED_MODEL}")
+                logger.error(f"RAG indexing error: {str(e)}")
+
+        # Chat history
+        for msg in st.session_state.pdf_chat:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        with st.form(key="rag_chat_form", clear_on_submit=True):
+            rag_question = st.text_input("Ask a question about your indexed PDFs",
+                                         placeholder="e.g. What are the key findings across these papers?")
+            if st.form_submit_button("Ask") and rag_question.strip():
+                st.session_state.pdf_chat.append({"role": "user", "content": rag_question})
+                try:
+                    retrieved = retrieve(rag_question)
+                    if not retrieved:
+                        answer = "No indexed content found — click 'Index PDFs for chat' first."
+                        st.info(answer)
+                    else:
+                        prompt = build_rag_prompt(rag_question, retrieved, st.session_state.pdf_chat[:-1])
+                        with st.chat_message("assistant"):
+                            answer = st.write_stream(stream_generate(prompt, st.session_state.get('ollama_model')))
+                            st.caption("Sources: " + ", ".join(sorted({doc for doc, _, _ in retrieved})))
+                    st.session_state.pdf_chat.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.session_state.pdf_chat.pop()  # drop the unanswered question
+                    st.error(f"Chat failed: {str(e)}")
+                    logger.error(f"RAG chat error: {str(e)}")
 
     # Add LLM interaction section
     if st.session_state.scraped_data:
