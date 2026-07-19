@@ -45,6 +45,7 @@ No separate Chrome/ChromeDriver install needed — Playwright manages its own he
 - **Scrape History**: Every job (URL, mode, items found, time) is logged to SQLite and shown in a sidebar panel with one-click re-run
 - **Page Caching**: Scraped pages are cached on disk (1h TTL) so re-analysis is instant
 - **REST API**: A FastAPI server (`api.py`) exposes `/scrape`, `/pdfs`, and `/extract` so scripts and other tools can use the pipeline programmatically — run `uvicorn api:app` and see `/docs`
+- **CLI**: Drive the pipeline from the terminal and pipe JSON into other tools — `python cli.py scrape <url>`, `python cli.py pdfs <url>`, `python cli.py extract <url> --fields "name,price"`
 - **Custom Download Location**: Choose where to save downloaded files
 
 ## Local Installation
