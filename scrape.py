@@ -4,6 +4,7 @@ import os
 import requests
 import urllib.parse
 import re
+import json
 import logging
 from retrying import retry
 import hashlib
@@ -298,6 +299,95 @@ def crawl_website(start_url, max_depth=1, max_pages=20):
             rate_limit()
 
     logger.info(f"Crawl done: {len(pages)} pages, {len(pdf_links)} PDF links")
+    return {'pages': pages, 'pdf_links': list(pdf_links)}
+
+def extract_candidate_links(html, base_url, domain):
+    """Extract same-domain links as (url, link_text) pairs, deduped, fragments stripped."""
+    soup = BeautifulSoup(html, 'html.parser')
+    seen = set()
+    candidates = []
+    for a in soup.find_all('a', href=True):
+        href = get_absolute_url(base_url, a.get('href'))
+        if not href:
+            continue
+        href = href.split('#')[0]
+        if not href or urlparse(href).netloc != domain or href in seen:
+            continue
+        seen.add(href)
+        candidates.append((href, a.get_text(strip=True)[:120]))
+    return candidates
+
+def parse_ranked_indices(text, n_candidates):
+    """Parse an LLM response like '[2, 0, 5]' into valid, deduped candidate indices."""
+    match = re.search(r'\[[\d,\s]*\]', text)
+    if not match:
+        return []
+    try:
+        indices = json.loads(match.group(0))
+    except ValueError:
+        return []
+    out = []
+    for i in indices:
+        if isinstance(i, int) and 0 <= i < n_candidates and i not in out:
+            out.append(i)
+    return out
+
+def llm_rank_links(goal, candidates, model=None, top_n=8):
+    """Ask the LLM which candidate links best serve the goal. Returns ordered indices."""
+    import asyncio
+    import parse as parse_mod
+    listing = "\n".join(f"{i}: {text or '(no text)'} — {url}" for i, (url, text) in enumerate(candidates))
+    prompt = f"""You are guiding a focused web crawler. The user's goal: {goal}
+
+Candidate links:
+{listing}
+
+Return ONLY a JSON array of the indices (integers) of up to {top_n} links most likely to help achieve the goal, best first. Example: [3, 0, 7]. Return [] if none are relevant."""
+    response = asyncio.run(parse_mod._generate(prompt, model or parse_mod.MODEL_NAME))
+    return parse_ranked_indices(response, len(candidates))
+
+def smart_crawl(start_url, goal, max_depth=1, max_pages=15, ranker=None, model=None):
+    """Goal-directed crawl: at each page the LLM picks which same-domain links to follow.
+    Returns {'pages': [urls visited], 'pdf_links': [...]}"""
+    if ranker is None:
+        ranker = lambda g, cands: llm_rank_links(g, cands, model)
+    domain = urlparse(start_url).netloc
+    seen = {start_url}
+    queue = [(start_url, 0)]
+    pdf_links = set()
+    pages = []
+
+    while queue and len(pages) < max_pages:
+        url, depth = queue.pop(0)
+        if not is_allowed_by_robots(url):
+            logger.info(f"Skipping (robots.txt): {url}")
+            continue
+        try:
+            html = get_page_html(url)
+        except Exception as e:
+            logger.warning(f"Failed to fetch {url}: {str(e)}")
+            continue
+        pages.append(url)
+
+        soup = BeautifulSoup(html, 'html.parser')
+        for element in soup.find_all(href=True):
+            href = get_absolute_url(url, element.get('href'))
+            if href and is_download_link(href):
+                pdf_links.add(href)
+
+        if depth < max_depth:
+            candidates = [(u, t) for u, t in extract_candidate_links(html, url, domain)
+                          if u not in seen and not is_download_link(u)]
+            if candidates:
+                for idx in ranker(goal, candidates):
+                    chosen = candidates[idx][0]
+                    if chosen not in seen:
+                        seen.add(chosen)
+                        queue.append((chosen, depth + 1))
+        if queue:
+            rate_limit()
+
+    logger.info(f"Smart crawl done: {len(pages)} pages, {len(pdf_links)} PDF links")
     return {'pages': pages, 'pdf_links': list(pdf_links)}
 
 def download_pdfs_concurrent(pdf_links, download_folder="downloads", max_workers=4, progress_callback=None):

@@ -1,5 +1,5 @@
 import streamlit as st
-from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf, crawl_website, download_pdfs_concurrent
+from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf, crawl_website, smart_crawl, download_pdfs_concurrent
 from parse import (
     sync_parse_with_deepseek as parse_with_ollama,
     get_ollama_status,
@@ -498,9 +498,16 @@ def scraping_section():
 
     # Crawl depth (PDF mode): 0 = this page only, 1+ = follow same-site links
     crawl_depth = 0
+    crawl_goal = ""
     if scraping_mode == "Scrape for PDF":
         crawl_depth = st.slider("Crawl depth (follow same-site links)", 0, 3, 0,
                                 help="0 scans only this page. 1+ also crawls linked pages on the same domain (respects robots.txt, max 20 pages).")
+        if crawl_depth > 0:
+            crawl_goal = st.text_input(
+                "Crawl goal (optional — AI picks which links to follow)",
+                placeholder="e.g. find 2024 exam papers",
+                help="With a goal, the AI ranks links on each page and only follows the most relevant ones."
+            )
     
     if st.button("Start Scraping"):
         if not url:
@@ -514,7 +521,11 @@ def scraping_section():
                     st.session_state.scraped_data = data
                 else:  # Scrape for PDF
                     if crawl_depth > 0:
-                        crawl_result = crawl_website(url, max_depth=crawl_depth)
+                        if crawl_goal.strip():
+                            crawl_result = smart_crawl(url, crawl_goal, max_depth=crawl_depth,
+                                                       model=st.session_state.get('ollama_model'))
+                        else:
+                            crawl_result = crawl_website(url, max_depth=crawl_depth)
                         pdf_links = crawl_result['pdf_links']
                         st.info(f"Crawled {len(crawl_result['pages'])} pages")
                     else:
