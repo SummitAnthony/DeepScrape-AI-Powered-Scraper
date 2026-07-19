@@ -4,9 +4,11 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order)
 
-- [ ] **Cleanup & README**: remove `st.write("Debug: ...")` lines, dedupe the two batch-download blocks, update README + requirements pins.
+(empty — all items shipped)
 
 ## Done
+
+- [x] **Cleanup & README**: debug lines removed, README covers all new features, pymupdf added — `ac64dfc`
 
 - [x] **Caching**: disk cache for pages (URL hash, 1h TTL), verified roundtrip — `688ef91`
 - [x] **Deep crawl mode**: same-domain BFS + robots.txt + concurrent downloads — `df75bf6`
