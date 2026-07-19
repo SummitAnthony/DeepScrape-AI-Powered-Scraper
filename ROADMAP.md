@@ -4,11 +4,11 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 3 (TDD + update README Features section every iteration)
 
-- [ ] **Scrape-history dashboard**: SQLite job log (url, mode, timestamp, items found); "History" sidebar page listing past jobs with one-click re-run. TDD: job-store tests.
 - [ ] **API mode**: FastAPI app (`api.py`) exposing /scrape, /pdfs, /extract endpoints reusing the same pipeline. TDD: endpoint tests via TestClient.
 
 ## Done
 
+- [x] **Scrape-history dashboard**: SQLite job log + sidebar re-run (5 tests) — `41cff69`
 - [x] **More file types**: DOCX/XLSX/CSV harvest + extraction, fed to AI/RAG (15 tests) — `c761e21`
 - [x] **Sitemap ingestion**: sitemap.xml + nested-index parsing, whole-site URL discovery (6 tests) — `d0dfc3a`
 - [x] **Anti-bot resilience**: curl_cffi TLS impersonation tier + proxy rotation (7 tests) — `22a3d81`
