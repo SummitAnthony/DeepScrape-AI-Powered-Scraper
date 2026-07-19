@@ -50,3 +50,6 @@ geckodriver.exe
 
 # RAG index
 rag_index.db
+
+# Watch history
+watch_history.db

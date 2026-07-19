@@ -11,6 +11,7 @@ from parse import (
     MAX_CONTENT_CHARS,
 )
 from rag import index_pdfs, retrieve, build_rag_prompt, DEFAULT_EMBED_MODEL
+from watch import check_url
 import time
 import os
 import base64
@@ -488,7 +489,7 @@ def scraping_section():
     # Scraping mode selection
     scraping_mode = st.radio(
         "Select Scraping Mode",
-        ["Scrape Website", "Scrape for PDF"],
+        ["Scrape Website", "Scrape for PDF", "Watch Page"],
         horizontal=True,
         key="scraping_mode"
     )
@@ -519,6 +520,24 @@ def scraping_section():
                 if scraping_mode == "Scrape Website":
                     data = scrape_website_content(url)
                     st.session_state.scraped_data = data
+                elif scraping_mode == "Watch Page":
+                    result = check_url(url)
+                    if result["first_run"]:
+                        st.info("📸 First snapshot saved. Check again later to see what changed.")
+                    elif not result["changed"]:
+                        st.success("✅ No changes since the last check.")
+                    else:
+                        last_checked = datetime.fromtimestamp(result["previous_at"]).strftime("%Y-%m-%d %H:%M")
+                        st.warning(f"🔔 Page changed since {last_checked}")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"#### ➕ Added ({len(result['added'])})")
+                            for line in result["added"][:50]:
+                                st.markdown(f"- {line}")
+                        with col2:
+                            st.markdown(f"#### ➖ Removed ({len(result['removed'])})")
+                            for line in result["removed"][:50]:
+                                st.markdown(f"- {line}")
                 else:  # Scrape for PDF
                     if crawl_depth > 0:
                         if crawl_goal.strip():
