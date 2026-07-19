@@ -51,6 +51,10 @@ class WatchStore:
             "SELECT content, fetched_at FROM snapshots WHERE url = ? ORDER BY id DESC LIMIT 1", (url,)
         ).fetchone()
 
+    def distinct_urls(self):
+        """Return every distinct URL that has been snapshotted."""
+        return [row[0] for row in self.conn.execute("SELECT DISTINCT url FROM snapshots").fetchall()]
+
     def close(self):
         self.conn.close()
 
