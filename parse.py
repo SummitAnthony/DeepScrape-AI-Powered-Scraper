@@ -237,6 +237,36 @@ User's instructions: {instructions}"""
     except Exception as e:
         return f"Error analyzing content: {str(e)}. Please make sure Ollama is running and properly configured."
 
+def sync_extract_structured(content, fields, model=None):
+    """Extract records with the given fields from content as JSON.
+    Returns (records, error) — one of the two is None."""
+    model = model or MODEL_NAME
+    prompt = f"""Extract structured data from the content below.
+
+Fields to extract for each record: {', '.join(fields)}
+
+Return ONLY a JSON array of objects, each object having exactly these keys: {', '.join(fields)}.
+No explanations, no markdown fences, just the JSON array. Return [] if nothing matches.
+
+Content:
+{content[:MAX_CONTENT_CHARS]}"""
+    try:
+        result = asyncio.run(_generate(prompt, model))
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+    # Pull the JSON array out of the response (models often wrap it in prose/fences)
+    match = re.search(r'\[.*\]', result, re.DOTALL)
+    if not match:
+        return None, f"Could not find a JSON array in the model response: {result[:200]}"
+    try:
+        records = json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        return None, f"Model returned invalid JSON: {str(e)}"
+    if not isinstance(records, list):
+        return None, "Model did not return a JSON array"
+    return records, None
+
 def stream_generate(prompt, model=None):
     """Yield Ollama response tokens as they arrive (sync generator for st.write_stream)"""
     import requests

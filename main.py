@@ -5,6 +5,7 @@ from parse import (
     get_ollama_status,
     get_available_models,
     sync_parse_large_content,
+    sync_extract_structured,
     stream_generate,
     sync_extract_pdf_text,
     MAX_CONTENT_CHARS,
@@ -447,6 +448,42 @@ def download_pdfs_with_progress(pdf_links, download_dir):
     
     return successful_downloads, failed_downloads
 
+def scraped_data_to_text(data):
+    """Flatten scraped data dict into plain text for the LLM"""
+    content_text = ""
+    if isinstance(data, dict):
+        if 'title' in data:
+            content_text += f"# {data['title']}\n\n"
+        if data.get('headings'):
+            content_text += "## Headings\n"
+            for heading in data['headings']:
+                content_text += f"- {heading['text']}\n"
+            content_text += "\n"
+        if data.get('paragraphs'):
+            content_text += "## Content\n"
+            for p in data['paragraphs']:
+                content_text += f"{p}\n\n"
+        if data.get('sections'):
+            for section in data['sections']:
+                content_text += f"## {section['heading']}\n"
+                for content in section['content']:
+                    content_text += f"{content}\n\n"
+    return content_text
+
+def records_to_csv(records):
+    """Convert a list of dicts to CSV text (union of keys, insertion order)"""
+    import csv, io
+    fieldnames = []
+    for r in records:
+        for k in r.keys():
+            if k not in fieldnames:
+                fieldnames.append(k)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(records)
+    return buf.getvalue()
+
 def scraping_section():
     """Scraping section with two modes: Website and PDF"""
     st.markdown("""
@@ -636,31 +673,7 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                             st.write("Debug: Processing data type:", type(data))
                             
                             # Convert scraped data to text format for LLM
-                            content_text = ""
-                            if isinstance(data, dict):
-                                # Add title if available
-                                if 'title' in data:
-                                    content_text += f"# {data['title']}\n\n"
-                                
-                                # Add headings if available
-                                if 'headings' in data:
-                                    content_text += "## Headings\n"
-                                    for heading in data['headings']:
-                                        content_text += f"- {heading['text']}\n"
-                                    content_text += "\n"
-                                
-                                # Add paragraphs if available
-                                if 'paragraphs' in data:
-                                    content_text += "## Content\n"
-                                    for p in data['paragraphs']:
-                                        content_text += f"{p}\n\n"
-                                
-                                # Add sections if available
-                                if 'sections' in data:
-                                    for section in data['sections']:
-                                        content_text += f"## {section['heading']}\n"
-                                        for content in section['content']:
-                                            content_text += f"{content}\n\n"
+                            content_text = scraped_data_to_text(data)
                             
                             model = st.session_state.get('ollama_model')
                             if len(content_text) <= MAX_CONTENT_CHARS:
@@ -691,6 +704,45 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                     except Exception as e:
                         st.error(f"Error during LLM processing: {str(e)}")
                         logger.error(f"LLM processing error: {str(e)}")
+
+        # Structured extraction: fields -> JSON -> table + downloads
+        st.markdown("### Structured Extraction")
+        with st.form(key="extract_form"):
+            fields_input = st.text_input(
+                "Fields to extract (comma-separated)",
+                placeholder="name, price, date",
+                key="extract_fields"
+            )
+            if st.form_submit_button("Extract as Table"):
+                if not fields_input.strip():
+                    st.error("Please enter at least one field")
+                elif not ollama_status["available"]:
+                    st.error(ollama_status["message"])
+                else:
+                    fields = [f.strip() for f in fields_input.split(',') if f.strip()]
+                    with st.spinner("Extracting structured data..."):
+                        records, err = sync_extract_structured(
+                            scraped_data_to_text(st.session_state.scraped_data),
+                            fields,
+                            st.session_state.get('ollama_model')
+                        )
+                    if err:
+                        st.error(err)
+                    elif not records:
+                        st.warning("No records extracted")
+                    else:
+                        st.session_state.extracted_records = records
+
+        if st.session_state.get('extracted_records'):
+            records = st.session_state.extracted_records
+            st.dataframe(records)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button("Download JSON", json.dumps(records, indent=2, ensure_ascii=False),
+                                   "extracted.json", "application/json")
+            with col2:
+                st.download_button("Download CSV", records_to_csv(records),
+                                   "extracted.csv", "text/csv")
 
 # Add a separate section for batch downloads
 if 'pdf_links' in st.session_state and st.session_state.pdf_links:
