@@ -12,6 +12,12 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![AI](https://img.shields.io/badge/AI-local%20via%20Ollama-orange)
 
+<br/>
+
+![DeepScrape extracting structured content from a live web page](docs/screenshot.png)
+
+<sub>Live scrape of a real page — title and structure extracted in seconds, ready for AI analysis.</sub>
+
 </div>
 
 ---
