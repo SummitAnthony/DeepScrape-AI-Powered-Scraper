@@ -1,9 +1,3 @@
-import selenium
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup as BeautifulSoup
 import time
 import os
@@ -18,7 +12,6 @@ from urllib.robotparser import RobotFileParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import random
-from webdriver_manager.chrome import ChromeDriverManager
 import platform
 import sys
 
@@ -48,57 +41,6 @@ USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
 ]
 
-def verify_chromedriver():
-    """Verify ChromeDriver installation and version"""
-    try:
-        chrome_driver_path = os.path.join(os.getcwd(), "chromedriver.exe")
-        if not os.path.exists(chrome_driver_path):
-            logger.error(f"ChromeDriver not found at: {chrome_driver_path}")
-            return False
-        
-        # Check if it's a 64-bit executable
-        import struct
-        with open(chrome_driver_path, 'rb') as f:
-            f.seek(0x3C)  # PE header offset
-            pe_header_offset = struct.unpack('<I', f.read(4))[0]
-            f.seek(pe_header_offset + 4)  # Machine type offset
-            machine_type = struct.unpack('<H', f.read(2))[0]
-            
-        is_64bit = machine_type == 0x8664
-        logger.info(f"ChromeDriver is {'64-bit' if is_64bit else '32-bit'}")
-        
-        if not is_64bit:
-            logger.error("ChromeDriver must be 64-bit to match your Chrome installation")
-            return False
-            
-        return True
-    except Exception as e:
-        logger.error(f"Error verifying ChromeDriver: {str(e)}")
-        return False
-
-def get_chrome_version():
-    """Get the installed Chrome version"""
-    try:
-        import winreg
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
-        version, _ = winreg.QueryValueEx(key, "version")
-        logger.info(f"Found Chrome version in registry: {version}")
-        return version
-    except Exception as e:
-        logger.error(f"Error getting Chrome version from registry: {str(e)}")
-        try:
-            # Try alternative method using Chrome's path
-            chrome_path = r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
-            if os.path.exists(chrome_path):
-                import subprocess
-                result = subprocess.run([chrome_path, '--version'], capture_output=True, text=True)
-                version = result.stdout.strip().split()[-1]
-                logger.info(f"Found Chrome version from executable: {version}")
-                return version
-        except Exception as e2:
-            logger.error(f"Error getting Chrome version from executable: {str(e2)}")
-        return None
-
 def get_random_user_agent():
     """Get a random user agent from the list"""
     return random.choice(USER_AGENTS)
@@ -110,7 +52,7 @@ def rate_limit():
 
 def fetch_html(url, timeout=15):
     """Fetch page HTML with plain requests (fast path).
-    Returns HTML string, or None if the caller should fall back to Selenium."""
+    Returns HTML string, or None if the caller should fall back to the headless browser."""
     try:
         headers = {
             'User-Agent': get_random_user_agent(),
@@ -122,7 +64,7 @@ def fetch_html(url, timeout=15):
             return None
         return response.text
     except Exception as e:
-        logger.info(f"requests fetch failed ({e}); falling back to Selenium")
+        logger.info(f"requests fetch failed ({e}); falling back to headless browser")
         return None
 
 def create_download_folder(base_folder="downloads"):
@@ -245,8 +187,22 @@ def _cache_put(url, html):
     except Exception as e:
         logger.warning(f"Cache write failed: {str(e)}")
 
-def get_page_html(website, use_cache=True):
-    """Get page HTML: disk cache first, then plain requests, then headless Selenium."""
+def _browser_fetch(url):
+    """Fetch fully rendered HTML with headless Chromium via Playwright."""
+    from playwright.sync_api import sync_playwright
+    logger.info("Launching headless Chromium (Playwright)...")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(user_agent=get_random_user_agent())
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(2000)  # let dynamic content load
+            return page.content()
+        finally:
+            browser.close()
+
+def get_page_html(website, use_cache=True, browser_fetcher=None):
+    """Get page HTML: disk cache first, then plain requests, then headless browser."""
     if use_cache:
         cached = _cache_get(website)
         if cached is not None:
@@ -255,57 +211,16 @@ def get_page_html(website, use_cache=True):
     html = fetch_html(website)
     if html is not None:
         logger.info("Fetched page via requests (fast path)")
-        _cache_put(website, html)
-        return html
-
-    # Selenium fallback
-    chrome_version = get_chrome_version()
-    if not chrome_version:
-        raise Exception("Could not determine Chrome version. Please ensure Chrome is installed.")
-
-    if not verify_chromedriver():
-        raise Exception("ChromeDriver verification failed. Please ensure you have the correct 64-bit version installed.")
-
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument(f"user-agent={get_random_user_agent()}")
-    options.add_argument("--window-size=1920,1080")
-
-    logger.info("Initializing headless Chrome driver...")
-    try:
-        chrome_driver_path = os.path.join(os.getcwd(), "chromedriver.exe")
-        if not os.path.exists(chrome_driver_path):
-            raise Exception(f"ChromeDriver not found at: {chrome_driver_path}")
-        service = ChromeService(executable_path=chrome_driver_path)
-        driver = webdriver.Chrome(service=service, options=options)
-    except Exception as e:
-        if "This version of ChromeDriver only supports Chrome version" in str(e):
-            logger.error(f"ChromeDriver version mismatch. Your Chrome version is {chrome_version}. "
-                         "Download the matching driver from https://googlechromelabs.github.io/chrome-for-testing/")
-        raise
-
-    try:
-        driver.get(website)
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
-        time.sleep(2)  # let dynamic content load
-        html = driver.page_source
-    finally:
-        driver.quit()
+    else:
+        fetcher = browser_fetcher or _browser_fetch
+        html = fetcher(website)
 
     _cache_put(website, html)
     return html
 
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def scrape_website(website):
-    """Scrape website for PDF download links (requests first, Selenium fallback)"""
+    """Scrape website for PDF download links (requests first, headless browser fallback)"""
     try:
         logger.info(f"Starting scraping process for: {website}")
         html = get_page_html(website)

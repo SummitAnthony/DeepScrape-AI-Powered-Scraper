@@ -10,16 +10,17 @@ Every page fetch goes through a three-tier pipeline:
 
 1. **Disk cache** — pages already scraped in the last hour are served instantly
 2. **Plain requests** — fast path, no browser needed for static pages
-3. **Headless Chrome (Selenium)** — automatic fallback for JavaScript-heavy pages
+3. **Headless Chromium (Playwright)** — automatic fallback for JavaScript-heavy pages
 
 AI features run fully locally through [Ollama](https://ollama.ai/) — no API keys, no data leaves your machine.
 
 ## System Requirements
 
 - Python 3.8 or higher
-- Windows 10/11 (64-bit)
-- Google Chrome (any recent version — only needed for JS-heavy pages; the included downloader fetches the matching ChromeDriver automatically)
+- Windows 10/11 (64-bit), macOS, or Linux
 - [Ollama](https://ollama.ai/) with at least one model pulled (for AI features)
+
+No separate Chrome/ChromeDriver install needed — Playwright manages its own headless Chromium.
 
 ## Features
 
@@ -37,18 +38,7 @@ AI features run fully locally through [Ollama](https://ollama.ai/) — no API ke
 
 ## Local Installation
 
-### 1. Prerequisites
-
-#### Chrome Installation
-- Install any recent version of Google Chrome (64-bit). Chrome is only used as a fallback for JavaScript-heavy pages — most scraping runs without it.
-
-#### ChromeDriver Setup
-The application includes an automatic ChromeDriver downloader (`download_chromedriver.py`) that will:
-- Detect your Chrome version
-- Download the matching ChromeDriver version
-- Install it in the correct location
-
-### 2. Installation Steps
+### Installation Steps
 
 1. Clone the repository:
 ```bash
@@ -67,9 +57,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Download and setup ChromeDriver:
+4. Install the headless browser (used only for JavaScript-heavy pages):
 ```bash
-python download_chromedriver.py
+playwright install chromium
 ```
 
 5. Install Ollama (for AI features):
@@ -86,17 +76,10 @@ streamlit run main.py
 
 ## Troubleshooting
 
-### Chrome/ChromeDriver Version Mismatch
-If you encounter version mismatch errors:
-1. Check your Chrome version (Help > About Google Chrome)
-2. Run `python download_chromedriver.py` to download the matching ChromeDriver version
-3. Ensure ChromeDriver is in your PATH or in the project directory
-
-### Common Issues
-1. **ChromeDriver not found**: Run `python download_chromedriver.py`
-2. **Version mismatch**: Make sure Chrome and ChromeDriver versions match
-3. **Permission errors**: Run as administrator if needed
-4. **Antivirus blocking**: Add exceptions for ChromeDriver
+1. **"Executable doesn't exist" / browser errors**: Run `playwright install chromium`
+2. **AI features not working**: Make sure Ollama is running (`ollama serve`) and a model is pulled
+3. **RAG chat indexing fails**: Pull the embedding model — `ollama pull nomic-embed-text`
+4. **Permission errors**: Run as administrator if needed
 
 ## Usage
 
@@ -122,10 +105,11 @@ If you encounter version mismatch errors:
 
 ```
 DeepScrape-AI-Powered-Scraper/
-├── main.py                   # Streamlit UI: scraping, downloads, AI analysis, extraction
-├── scrape.py                 # Fetch pipeline (cache/requests/Selenium), crawler, PDF downloads
+├── main.py                   # Streamlit UI: scraping, downloads, AI analysis, extraction, RAG chat
+├── scrape.py                 # Fetch pipeline (cache/requests/Playwright), crawler, PDF downloads
 ├── parse.py                  # Ollama integration: streaming, map-reduce, structured extraction
-├── download_chromedriver.py  # Auto-downloads ChromeDriver matching your Chrome version
+├── rag.py                    # RAG: chunking, embeddings, SQLite vector store, cited answers
+├── tests/                    # pytest suite (run: python -m pytest -q)
 ├── setup.bat                 # Windows one-shot setup helper
 ├── requirements.txt          # Python dependencies
 ├── ROADMAP.md                # Improvement log (what shipped, what's next)
@@ -137,7 +121,7 @@ At runtime the app also creates `downloads/` (saved PDFs), `outputs/` (exports),
 
 ## Dependencies
 
-See `requirements.txt` for the full pinned list. Key packages: streamlit, selenium, beautifulsoup4, requests, aiohttp, PyPDF2, pymupdf, fpdf, retrying, webdriver_manager.
+See `requirements.txt` for the full pinned list. Key packages: streamlit, playwright, beautifulsoup4, requests, aiohttp, PyPDF2, pymupdf, fpdf, retrying.
 
 ## Contributing
 
@@ -150,5 +134,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - [Ollama](https://ollama.ai/) for AI capabilities
-- [Selenium](https://www.selenium.dev/) for web scraping
-- [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) for ChromeDriver
+- [Playwright](https://playwright.dev/) for headless browser automation

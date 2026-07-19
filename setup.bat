@@ -8,5 +8,8 @@ call venv\Scripts\activate.bat
 echo Installing dependencies...
 pip install -r requirements.txt
 
+echo Installing headless browser (Playwright Chromium)...
+playwright install chromium
+
 echo Setup complete! You can now run the application with:
 echo streamlit run main.py 
