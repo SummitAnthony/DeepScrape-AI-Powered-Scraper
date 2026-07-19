@@ -4,7 +4,6 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order)
 
-- [ ] **Wire PDFs into the AI layer**: `parse_with_ollama(pdf_paths, ...)` ignores `pdf_paths` — extract PDF text (already have `extract_text_from_pdf`) and feed it into the prompt. Add a "Analyze Downloaded PDFs" section in the UI.
 - [ ] **Headless + fast scraping**: enable `--headless=new`, try plain `requests` first and only fall back to Selenium when the page needs JS. Remove per-image `rate_limit()` sleep (it's metadata, not a request). Remove noisy per-link logging.
 - [ ] **Model picker**: sidebar dropdown populated from Ollama `/api/tags`; replace hardcoded `llama2`. Persist selection in session_state.
 - [ ] **Chunked map-reduce analysis**: for content larger than the context window, split (reuse `split_dom_content`), summarize chunks, then combine. Show progress.
@@ -16,4 +15,5 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Done
 
+- [x] **Wire PDFs into the AI layer**: PDF text extraction feeds Ollama; new Analyze Downloaded PDFs UI — `5e57534`
 - [x] **Fix broken Streamlit flow**: session_state-persisted results, working download buttons, llm_prompt key fix — `7b8c10c`
