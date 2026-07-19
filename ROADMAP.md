@@ -4,12 +4,12 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 3 (TDD + update README Features section every iteration)
 
-- [ ] **More file types**: harvest DOCX/XLSX/CSV alongside PDFs (extend `is_download_link` → `classify_download_link`); extract their text for analysis and RAG (python-docx, openpyxl). TDD: classification + extraction tests.
 - [ ] **Scrape-history dashboard**: SQLite job log (url, mode, timestamp, items found); "History" sidebar page listing past jobs with one-click re-run. TDD: job-store tests.
 - [ ] **API mode**: FastAPI app (`api.py`) exposing /scrape, /pdfs, /extract endpoints reusing the same pipeline. TDD: endpoint tests via TestClient.
 
 ## Done
 
+- [x] **More file types**: DOCX/XLSX/CSV harvest + extraction, fed to AI/RAG (15 tests) — `c761e21`
 - [x] **Sitemap ingestion**: sitemap.xml + nested-index parsing, whole-site URL discovery (6 tests) — `d0dfc3a`
 - [x] **Anti-bot resilience**: curl_cffi TLS impersonation tier + proxy rotation (7 tests) — `22a3d81`
 - [x] **Watch mode**: SQLite snapshots + line diffs + Watch Page UI (11 tests) — `dbd553c`
