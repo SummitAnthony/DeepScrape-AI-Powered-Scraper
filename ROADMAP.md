@@ -2,11 +2,13 @@
 
 One item per iteration. Implement minimally, verify, commit, push, check off.
 
-## Queue (priority order) — Round 4: the cool ones (TDD + update README Features every iteration)
+## Queue (priority order)
 
-- [ ] **Tournament extraction**: run structured extraction N times (varied prompts/samples), then a merge/vote pass picks the most consistent record set for higher accuracy. TDD: voting/merge logic tests with canned candidate sets.
+(empty — rounds 1–4 fully shipped)
 
 ## Done
+
+- [x] **Tournament extraction**: 3× extraction + majority-vote merge (8 tests) — `7129a57`
 
 - [x] **Multi-turn conversation memory**: budget-trimmed Conversation in PDF chat (8 tests) — `1c47885`
 - [x] **Vision analysis**: full-page screenshot → llava via Ollama (6 tests) — `16c4fb3`
