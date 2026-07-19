@@ -4,11 +4,11 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 4: the cool ones (TDD + update README Features every iteration)
 
-- [ ] **Multi-turn conversation memory**: a reusable `Conversation` class (append turns, trim to a token/char budget, render to prompt) wired into the content-analysis and PDF-chat flows so follow-ups keep context. TDD: append/trim/render tests.
 - [ ] **Tournament extraction**: run structured extraction N times (varied prompts/samples), then a merge/vote pass picks the most consistent record set for higher accuracy. TDD: voting/merge logic tests with canned candidate sets.
 
 ## Done
 
+- [x] **Multi-turn conversation memory**: budget-trimmed Conversation in PDF chat (8 tests) — `1c47885`
 - [x] **Vision analysis**: full-page screenshot → llava via Ollama (6 tests) — `16c4fb3`
 - [x] **API mode**: FastAPI /scrape, /pdfs, /extract endpoints (6 tests) — `f3e44c8`
 
