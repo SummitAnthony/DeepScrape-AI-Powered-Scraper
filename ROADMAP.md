@@ -4,11 +4,11 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order)
 
-- [ ] **Caching**: cache scraped pages (URL hash → disk, TTL) so re-analysis doesn't re-scrape.
 - [ ] **Cleanup & README**: remove `st.write("Debug: ...")` lines, dedupe the two batch-download blocks, update README + requirements pins.
 
 ## Done
 
+- [x] **Caching**: disk cache for pages (URL hash, 1h TTL), verified roundtrip — `688ef91`
 - [x] **Deep crawl mode**: same-domain BFS + robots.txt + concurrent downloads — `df75bf6`
 - [x] **Structured extraction**: fields → LLM JSON → table + CSV/JSON downloads — `aecc355`
 - [x] **Streaming responses**: st.write_stream for content + PDF analysis — `8c8f0d4`
