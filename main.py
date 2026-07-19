@@ -635,16 +635,13 @@ Provide a clear, well-formatted response that directly addresses the user's requ
         if st.button("Test LLM Connection"):
             try:
                 with st.spinner("Testing LLM connection..."):
-                    st.write("Debug: Testing LLM connection...")
                     test_result = parse_with_ollama([], "Please respond with 'LLM is working' if you can read this message.", st.session_state.get('ollama_model'))
-                    st.write("Debug: LLM Test Response:", test_result)
                     if "LLM is working" in test_result:
                         st.success("✅ LLM is working correctly!")
                     else:
                         st.error("❌ LLM test failed. Response: " + test_result)
             except Exception as e:
                 st.error(f"LLM Test Error: {str(e)}")
-                st.write("Debug - Full error:", str(e))
 
         # Create a form for LLM processing
         with st.form(key="llm_form"):
@@ -665,7 +662,6 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                     try:
                         with st.spinner("Processing with LLM..."):
                             data = st.session_state.scraped_data
-                            st.write("Debug: Processing data type:", type(data))
                             
                             # Convert scraped data to text format for LLM
                             content_text = scraped_data_to_text(data)

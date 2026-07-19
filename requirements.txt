@@ -9,6 +9,7 @@ python-dotenv==1.0.1
 aiohttp==3.9.3
 html5lib==1.1
 PyPDF2==3.0.1
+pymupdf
 python-multipart==0.0.9
 markdown-it-py==3.0.0
 mdurl==0.1.2

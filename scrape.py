@@ -219,11 +219,43 @@ def get_filename_from_url(url, response):
         logger.error(f"Error getting filename: {str(e)}")
         return f"error_{hash(url)}.pdf"
 
-def get_page_html(website):
-    """Get page HTML: plain requests first, headless Selenium fallback for JS-heavy pages."""
+# Page cache: URL hash -> HTML on disk, with TTL
+CACHE_DIR = ".page_cache"
+CACHE_TTL = 3600  # seconds
+
+def _cache_path(url):
+    return os.path.join(CACHE_DIR, hashlib.md5(url.encode()).hexdigest() + ".html")
+
+def _cache_get(url):
+    try:
+        path = _cache_path(url)
+        if os.path.exists(path) and time.time() - os.path.getmtime(path) < CACHE_TTL:
+            with open(path, 'r', encoding='utf-8') as f:
+                logger.info(f"Cache hit: {url}")
+                return f.read()
+    except Exception as e:
+        logger.warning(f"Cache read failed: {str(e)}")
+    return None
+
+def _cache_put(url, html):
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(_cache_path(url), 'w', encoding='utf-8') as f:
+            f.write(html)
+    except Exception as e:
+        logger.warning(f"Cache write failed: {str(e)}")
+
+def get_page_html(website, use_cache=True):
+    """Get page HTML: disk cache first, then plain requests, then headless Selenium."""
+    if use_cache:
+        cached = _cache_get(website)
+        if cached is not None:
+            return cached
+
     html = fetch_html(website)
     if html is not None:
         logger.info("Fetched page via requests (fast path)")
+        _cache_put(website, html)
         return html
 
     # Selenium fallback
@@ -264,9 +296,12 @@ def get_page_html(website):
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
         time.sleep(2)  # let dynamic content load
-        return driver.page_source
+        html = driver.page_source
     finally:
         driver.quit()
+
+    _cache_put(website, html)
+    return html
 
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def scrape_website(website):

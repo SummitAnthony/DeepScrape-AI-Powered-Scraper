@@ -13,11 +13,16 @@ How to - https://www.youtube.com/watch?v=plZyfU9T70Q
 
 ## Features
 
+- **Fast Scraping**: Plain-requests fetching with automatic headless-Chrome fallback for JS-heavy pages
+- **Deep Crawl**: Follow same-domain links up to depth 3 (respects robots.txt) to find PDFs across a whole site
 - **PDF Scraping**: Automatically finds and downloads PDF files from websites
-- **Batch Download**: Download multiple PDFs at once with progress tracking
-- **Individual Downloads**: Download specific PDFs individually
-- **AI Analysis**: Process scraped content using AI (requires Ollama)
-- **User-Friendly Interface**: Clean and intuitive Streamlit interface
+- **Concurrent Batch Download**: Download multiple PDFs in parallel with progress tracking
+- **AI Analysis**: Ask anything about scraped content or downloaded PDFs (requires Ollama)
+  - Streaming responses render live as they're generated
+  - Large content is automatically chunked and analyzed map-reduce style
+  - Pick any locally installed Ollama model from the sidebar
+- **Structured Extraction**: Give a list of fields (e.g. `name, price, date`) and get a table with CSV/JSON export
+- **Page Caching**: Scraped pages are cached on disk (1h TTL) so re-analysis is instant
 - **Custom Download Location**: Choose where to save downloaded files
 
 ## Local Installation
@@ -97,10 +102,15 @@ If you encounter version mismatch errors:
 3. Enter a website URL and click "Start Scraping"
 
 4. For PDF scraping:
+   - Optionally set a crawl depth to also scan linked pages on the same domain
    - View the list of found PDFs
-   - Choose to download all PDFs or individual files
+   - Choose to download all PDFs (concurrent) or individual files
    - Select your preferred download location
-   - Monitor download progress
+   - Use "Analyze Downloaded PDFs" to ask the AI about their contents
+
+5. For website content:
+   - Process the content with free-form instructions (streams live)
+   - Or use "Structured Extraction" to pull specific fields into a downloadable table
 
 ## Project Structure
 
@@ -117,14 +127,7 @@ DeepScrape-AI-Powered-Scraper/
 
 ## Dependencies
 
-- streamlit
-- selenium
-- beautifulsoup4
-- requests
-- fpdf
-- tkinter
-- retrying
-- webdriver_manager
+See `requirements.txt` for the full pinned list. Key packages: streamlit, selenium, beautifulsoup4, requests, aiohttp, PyPDF2, pymupdf, fpdf, retrying, webdriver_manager.
 
 ## Contributing
 
