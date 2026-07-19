@@ -51,15 +51,34 @@ def rate_limit():
     delay = RATE_LIMIT_DELAY + random.uniform(0, 1)
     time.sleep(delay)
 
+def load_auth(path="cookies.json"):
+    """Load auth cookies/headers from JSON. Returns {'cookies': {...}, 'headers': {...}}.
+    Missing or malformed file -> empty dicts."""
+    empty = {"cookies": {}, "headers": {}}
+    if not os.path.exists(path):
+        return empty
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        return {"cookies": data.get("cookies", {}) or {}, "headers": data.get("headers", {}) or {}}
+    except Exception as e:
+        logger.warning(f"Could not load auth from {path}: {str(e)}")
+        return empty
+
+# Module-level auth, populated from cookies.json at import
+_auth = load_auth()
+
 def fetch_html(url, timeout=15):
-    """Fetch page HTML with plain requests (fast path).
-    Returns HTML string, or None if the caller should fall back to the headless browser."""
+    """Fetch page HTML with plain requests (fast path). Applies any configured auth.
+    Returns HTML string, or None if the caller should fall back to the next tier."""
     try:
         headers = {
             'User-Agent': get_random_user_agent(),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
-        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+        headers.update(_auth.get("headers", {}))
+        cookies = _auth.get("cookies") or None
+        response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True, cookies=cookies)
         response.raise_for_status()
         if 'html' not in response.headers.get('Content-Type', '').lower():
             return None
@@ -69,7 +88,7 @@ def fetch_html(url, timeout=15):
         return None
 
 def fetch_html_impersonate(url, proxy=None):
-    """Fetch HTML impersonating a real browser's TLS fingerprint via curl_cffi.
+    """Fetch HTML impersonating a real browser's TLS fingerprint via curl_cffi. Applies auth.
     Returns HTML string, or None to fall back to the headless browser."""
     try:
         from curl_cffi import requests as cffi_requests
@@ -78,7 +97,10 @@ def fetch_html_impersonate(url, proxy=None):
         return None
     try:
         proxies = {"http": proxy, "https": proxy} if proxy else None
-        response = cffi_requests.get(url, impersonate="chrome", timeout=20, proxies=proxies)
+        headers = _auth.get("headers") or None
+        cookies = _auth.get("cookies") or None
+        response = cffi_requests.get(url, impersonate="chrome", timeout=20, proxies=proxies,
+                                     headers=headers, cookies=cookies)
         response.raise_for_status()
         if 'html' not in response.headers.get('Content-Type', '').lower():
             return None
@@ -255,7 +277,14 @@ def _browser_fetch(url):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
-            page = browser.new_page(user_agent=get_random_user_agent())
+            context = browser.new_context(
+                user_agent=get_random_user_agent(),
+                extra_http_headers=_auth.get("headers") or {},
+            )
+            cookies = _auth.get("cookies") or {}
+            if cookies:
+                context.add_cookies([{"name": n, "value": v, "url": url} for n, v in cookies.items()])
+            page = context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_timeout(2000)  # let dynamic content load
             return page.content()

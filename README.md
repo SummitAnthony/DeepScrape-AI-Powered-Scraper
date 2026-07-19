@@ -27,6 +27,7 @@ No separate Chrome/ChromeDriver install needed — Playwright manages its own he
 
 - **Fast Scraping**: Four-tier fetch pipeline (cache → requests → TLS impersonation → headless browser)
 - **Anti-Bot Resilience**: curl_cffi TLS fingerprint impersonation gets past common bot blocks; add a `proxies.txt` (one proxy per line) to rotate proxies per request
+- **Authenticated Scraping**: drop a `cookies.json` (`{"cookies": {...}, "headers": {...}}`) and DeepScrape injects it across all fetch tiers to reach login-walled pages
 - **Deep Crawl**: Follow same-domain links up to depth 3 (respects robots.txt) to find PDFs across a whole site
 - **Sitemap Ingestion**: Instantly discover every URL on a site by reading its `sitemap.xml` (handles nested sitemap indexes) — no crawling required
 - **Multi-Format Harvesting**: Finds and downloads PDF, DOCX, XLSX, and CSV files — all extractable for AI analysis and RAG chat
