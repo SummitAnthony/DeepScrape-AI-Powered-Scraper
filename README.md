@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🔍 DeepScrape
+# DeepScrape
 
 ### AI-Powered Web Scraper & Document Intelligence Platform
 
-**Scrape any site → harvest documents → ask AI anything about them.** Runs 100% locally.
+**Scrape any site, harvest documents, and ask AI anything about them.** Runs 100% locally.
 
 [![tests](https://github.com/SummitAnthony/DeepScrape-AI-Powered-Scraper/actions/workflows/tests.yml/badge.svg)](https://github.com/SummitAnthony/DeepScrape-AI-Powered-Scraper/actions/workflows/tests.yml)
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
@@ -26,17 +26,17 @@ DeepScrape started as a simple PDF downloader and grew — across five test-driv
 
 Use it three ways: a **Streamlit web app**, a **REST API**, or a **command-line tool**.
 
-## ✨ Highlights
+## Highlights
 
-- 🧠 **Chat with your documents** — RAG over harvested files with source citations and multi-turn memory
-- 👁️ **Vision analysis** — screenshots a page and reads its charts, images, and layout with a vision model
-- 🛡️ **Gets past defenses** — TLS-fingerprint impersonation, proxy rotation, and cookie/header auth for login-walled pages
-- 🕸️ **Smart crawling** — the AI decides which links to follow toward *your* goal; or ingest a whole site via `sitemap.xml`
-- 📊 **Structured extraction** — turn any page into a table (name, price, date…) with a majority-vote "tournament" mode for accuracy
-- 🔔 **Hands-free monitoring** — watch pages on a schedule and get Slack/Discord alerts when they change
-- 🔒 **Fully local & private** — all AI runs through [Ollama](https://ollama.ai/) on your own hardware
+- **Chat with your documents** — RAG over harvested files with source citations and multi-turn memory
+- **Vision analysis** — screenshots a page and reads its charts, images, and layout with a vision model
+- **Gets past defenses** — TLS-fingerprint impersonation, proxy rotation, and cookie/header auth for login-walled pages
+- **Smart crawling** — the AI decides which links to follow toward *your* goal; or ingest a whole site via `sitemap.xml`
+- **Structured extraction** — turn any page into a table (name, price, date…) with a majority-vote "tournament" mode for accuracy
+- **Hands-free monitoring** — watch pages on a schedule and get Slack/Discord alerts when they change
+- **Fully local and private** — all AI runs through [Ollama](https://ollama.ai/) on your own hardware
 
-## 🏗️ How It Works
+## How It Works
 
 Every page fetch cascades through a four-tier pipeline — it only escalates to a heavier tier when the lighter one is blocked, so static pages are instant and hard pages still get through:
 
@@ -53,7 +53,7 @@ flowchart LR
     Z --> F[AI Pipeline<br/>Ollama]
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # 1. Clone & install
@@ -71,7 +71,7 @@ ollama pull nomic-embed-text   # for RAG chat
 streamlit run main.py
 ```
 
-## 🖥️ Three Ways to Use It
+## Three Ways to Use It
 
 **Web app** — the full experience with live-streaming AI, RAG chat, and visual analysis:
 ```bash
@@ -95,7 +95,7 @@ curl -X POST localhost:8000/extract \
   -d '{"url": "https://example.com", "fields": ["name", "price"]}'
 ```
 
-## 🧩 Full Feature Set
+## Full Feature Set
 
 ### Fetching & Access
 - **Four-tier pipeline** — cache → requests → TLS impersonation → headless Chromium (Playwright)
@@ -122,21 +122,21 @@ curl -X POST localhost:8000/extract \
 - **Webhook alerts** — set `DEEPSCRAPE_WEBHOOK_URL` for Slack/Discord/generic notifications on change
 - **Scrape history** — every job logged to SQLite with one-click re-run in the UI
 
-## 🧪 Built Test-First
+## Built Test-First
 
 DeepScrape was developed across **5 iterative build rounds**, every feature shipped red-green TDD:
 
 | | |
 |---|---|
-| ✅ **153 tests** | across 18 test suites, all passing |
-| 🔄 **CI on every push** | GitHub Actions runs the full suite |
-| 📦 **12 focused modules** | clean separation: fetch, parse, RAG, vision, watch, API, CLI |
+| **153 tests** | across 18 test suites, all passing |
+| **CI on every push** | GitHub Actions runs the full suite |
+| **12 focused modules** | clean separation: fetch, parse, RAG, vision, watch, API, CLI |
 
 ```bash
 python -m pytest -q      # run the full suite
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 DeepScrape-AI-Powered-Scraper/
@@ -156,13 +156,13 @@ DeepScrape-AI-Powered-Scraper/
 └── requirements.txt
 ```
 
-## 🔧 Requirements
+## Requirements
 
-- **Python 3.8+** · Windows, macOS, or Linux
+- **Python 3.8+** on Windows, macOS, or Linux
 - **[Ollama](https://ollama.ai/)** with at least one model pulled (for AI features)
 - Playwright manages its own headless Chromium — **no Chrome/ChromeDriver install needed**
 
-## 🩹 Troubleshooting
+## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -171,15 +171,15 @@ DeepScrape-AI-Powered-Scraper/
 | RAG chat indexing fails | Pull the embedding model: `ollama pull nomic-embed-text` |
 | Visual analysis fails | Pull a vision model: `ollama pull llava` |
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome — please open an issue or PR. Run `python -m pytest -q` before submitting.
 
-## 📄 License
+## License
 
 MIT — see [LICENSE](LICENSE).
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 [Ollama](https://ollama.ai/) · [Playwright](https://playwright.dev/) · [Streamlit](https://streamlit.io/) · [FastAPI](https://fastapi.tiangolo.com/)
 
