@@ -1,5 +1,5 @@
 import streamlit as st
-from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf
+from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf, crawl_website, download_pdfs_concurrent
 from parse import (
     sync_parse_with_deepseek as parse_with_ollama,
     get_ollama_status,
@@ -401,51 +401,35 @@ def get_download_directory():
         return None
 
 def download_pdfs_with_progress(pdf_links, download_dir):
-    """Download PDFs with progress tracking"""
-    successful_downloads = []
-    failed_downloads = []
-    
-    # Create progress bar
+    """Download PDFs concurrently with progress tracking"""
     progress_bar = st.progress(0)
     status_text = st.empty()
-    
-    for i, link in enumerate(pdf_links):
-        try:
-            # Update progress
-            progress = (i + 1) / len(pdf_links)
-            progress_bar.progress(progress)
-            status_text.text(f"Downloading PDF {i + 1} of {len(pdf_links)}")
-            
-            # Clean and validate the link
-            if 'download_file.php' in link:
-                # Extract the actual PDF URL from the download link
-                try:
-                    actual_url = link.split('files=')[1]
-                    link = actual_url
-                except:
-                    pass
-            
-            # Download PDF
-            st.write(f"Debug: Downloading from {link}")
-            filepath = download_pdf(link, download_dir)
-            
-            if filepath:
-                successful_downloads.append(filepath)
-                if filepath not in st.session_state.downloaded_pdfs:
-                    st.session_state.downloaded_pdfs.append(filepath)
-                st.write(f"Debug: Successfully downloaded to {filepath}")
-            else:
-                failed_downloads.append(link)
-                st.write(f"Debug: Failed to download {link}")
-        except Exception as e:
-            logger.error(f"Error downloading {link}: {str(e)}")
-            st.write(f"Debug: Error downloading {link}: {str(e)}")
-            failed_downloads.append(link)
-    
-    # Clear progress indicators
+
+    # Clean download_file.php-style links
+    cleaned_links = []
+    for link in pdf_links:
+        if 'download_file.php' in link:
+            try:
+                link = link.split('files=')[1]
+            except IndexError:
+                pass
+        cleaned_links.append(link)
+
+    def show_progress(done, total):
+        progress_bar.progress(done / total)
+        status_text.text(f"Downloaded {done} of {total} PDFs")
+
+    successful_downloads, failed_downloads = download_pdfs_concurrent(
+        cleaned_links, download_dir, progress_callback=show_progress
+    )
+
+    for filepath in successful_downloads:
+        if filepath not in st.session_state.downloaded_pdfs:
+            st.session_state.downloaded_pdfs.append(filepath)
+
     progress_bar.empty()
     status_text.empty()
-    
+
     return successful_downloads, failed_downloads
 
 def scraped_data_to_text(data):
@@ -510,6 +494,12 @@ def scraping_section():
     
     # URL input
     url = st.text_input("Enter Website URL", placeholder="https://example.com", key="current_url")
+
+    # Crawl depth (PDF mode): 0 = this page only, 1+ = follow same-site links
+    crawl_depth = 0
+    if scraping_mode == "Scrape for PDF":
+        crawl_depth = st.slider("Crawl depth (follow same-site links)", 0, 3, 0,
+                                help="0 scans only this page. 1+ also crawls linked pages on the same domain (respects robots.txt, max 20 pages).")
     
     if st.button("Start Scraping"):
         if not url:
@@ -522,10 +512,15 @@ def scraping_section():
                     data = scrape_website_content(url)
                     st.session_state.scraped_data = data
                 else:  # Scrape for PDF
-                    pdf_links = scrape_website(url)
+                    if crawl_depth > 0:
+                        crawl_result = crawl_website(url, max_depth=crawl_depth)
+                        pdf_links = crawl_result['pdf_links']
+                        st.info(f"Crawled {len(crawl_result['pages'])} pages")
+                    else:
+                        pdf_links = scrape_website(url)
                     st.session_state.pdf_links = pdf_links
                     if not pdf_links:
-                        st.warning("No PDF files found on this page.")
+                        st.warning("No PDF files found.")
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             logger.error(f"Scraping error: {str(e)}")

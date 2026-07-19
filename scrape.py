@@ -14,6 +14,8 @@ import logging
 from retrying import retry
 import hashlib
 from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import random
 from webdriver_manager.chrome import ChromeDriverManager
@@ -287,6 +289,90 @@ def scrape_website(website):
     except Exception as e:
         logger.error(f"Critical error in scrape_website: {str(e)}")
         raise
+
+_robots_cache = {}
+
+def is_allowed_by_robots(url, user_agent='*'):
+    """Check robots.txt for the URL's domain (cached). Permissive on failure."""
+    try:
+        parsed = urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        if base not in _robots_cache:
+            rp = RobotFileParser()
+            rp.set_url(base + "/robots.txt")
+            try:
+                rp.read()
+            except Exception:
+                rp = None
+            _robots_cache[base] = rp
+        rp = _robots_cache[base]
+        return True if rp is None else rp.can_fetch(user_agent, url)
+    except Exception:
+        return True
+
+def crawl_website(start_url, max_depth=1, max_pages=20):
+    """BFS crawl of same-domain links up to max_depth, collecting PDF links.
+    Respects robots.txt. Returns {'pages': [urls visited], 'pdf_links': [...]}"""
+    domain = urlparse(start_url).netloc
+    seen = {start_url}
+    queue = [(start_url, 0)]
+    pdf_links = set()
+    pages = []
+
+    while queue and len(pages) < max_pages:
+        url, depth = queue.pop(0)
+        if not is_allowed_by_robots(url):
+            logger.info(f"Skipping (robots.txt): {url}")
+            continue
+        try:
+            html = get_page_html(url)
+        except Exception as e:
+            logger.warning(f"Failed to fetch {url}: {str(e)}")
+            continue
+        pages.append(url)
+        logger.info(f"Crawled ({depth}): {url}")
+
+        soup = BeautifulSoup(html, 'html.parser')
+        for element in soup.find_all(href=True):
+            href = get_absolute_url(url, element.get('href'))
+            if not href:
+                continue
+            if is_download_link(href):
+                pdf_links.add(href)
+            elif depth < max_depth and urlparse(href).netloc == domain:
+                clean = href.split('#')[0]
+                if clean not in seen:
+                    seen.add(clean)
+                    queue.append((clean, depth + 1))
+        if queue:
+            rate_limit()
+
+    logger.info(f"Crawl done: {len(pages)} pages, {len(pdf_links)} PDF links")
+    return {'pages': pages, 'pdf_links': list(pdf_links)}
+
+def download_pdfs_concurrent(pdf_links, download_folder="downloads", max_workers=4, progress_callback=None):
+    """Download PDFs concurrently. Returns (successful_filepaths, failed_links)."""
+    successful, failed = [], []
+    if not pdf_links:
+        return successful, failed
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(download_pdf, link, download_folder): link for link in pdf_links}
+        done = 0
+        for future in as_completed(futures):
+            link = futures[future]
+            done += 1
+            try:
+                filepath = future.result()
+            except Exception as e:
+                logger.error(f"Download failed for {link}: {str(e)}")
+                filepath = None
+            if filepath:
+                successful.append(filepath)
+            else:
+                failed.append(link)
+            if progress_callback:
+                progress_callback(done, len(futures))
+    return successful, failed
 
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def download_pdf(pdf_url, download_folder="downloads"):
