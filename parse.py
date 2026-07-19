@@ -237,6 +237,20 @@ User's instructions: {instructions}"""
     except Exception as e:
         return f"Error analyzing content: {str(e)}. Please make sure Ollama is running and properly configured."
 
+def _parse_json_records(result):
+    """Pull a JSON array of records out of an LLM response.
+    Returns (records, error) — one of the two is None."""
+    match = re.search(r'\[.*\]', result, re.DOTALL)
+    if not match:
+        return None, f"Could not find a JSON array in the model response: {result[:200]}"
+    try:
+        records = json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        return None, f"Model returned invalid JSON: {str(e)}"
+    if not isinstance(records, list):
+        return None, "Model did not return a JSON array"
+    return records, None
+
 def sync_extract_structured(content, fields, model=None):
     """Extract records with the given fields from content as JSON.
     Returns (records, error) — one of the two is None."""
@@ -256,16 +270,7 @@ Content:
         return None, f"Error: {str(e)}"
 
     # Pull the JSON array out of the response (models often wrap it in prose/fences)
-    match = re.search(r'\[.*\]', result, re.DOTALL)
-    if not match:
-        return None, f"Could not find a JSON array in the model response: {result[:200]}"
-    try:
-        records = json.loads(match.group(0))
-    except json.JSONDecodeError as e:
-        return None, f"Model returned invalid JSON: {str(e)}"
-    if not isinstance(records, list):
-        return None, "Model did not return a JSON array"
-    return records, None
+    return _parse_json_records(result)
 
 def stream_generate(prompt, model=None):
     """Yield Ollama response tokens as they arrive (sync generator for st.write_stream)"""
