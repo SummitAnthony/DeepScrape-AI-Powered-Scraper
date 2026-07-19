@@ -237,6 +237,48 @@ User's instructions: {instructions}"""
     except Exception as e:
         return f"Error analyzing content: {str(e)}. Please make sure Ollama is running and properly configured."
 
+def stream_generate(prompt, model=None):
+    """Yield Ollama response tokens as they arrive (sync generator for st.write_stream)"""
+    import requests
+    model = model or MODEL_NAME
+    data = {
+        "model": model,
+        "prompt": prompt,
+        "stream": True,
+        "options": {
+            "temperature": 0.7,
+            "num_predict": 4000,
+            "top_p": 0.9,
+            "top_k": 40
+        }
+    }
+    with requests.post(OLLAMA_API_URL, json=data, stream=True, timeout=300) as response:
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line:
+                continue
+            try:
+                part = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if 'response' in part:
+                yield part['response']
+            if part.get('done'):
+                break
+
+def sync_extract_pdf_text(pdf_paths):
+    """Extract combined text from PDFs (sync), capped for the context window"""
+    try:
+        texts = asyncio.run(process_pdf_files(pdf_paths))
+        combined = ""
+        for path, text in zip(pdf_paths, texts):
+            if text:
+                combined += f"\n--- {os.path.basename(path)} ---\n{text}"
+        return combined[:MAX_CONTENT_CHARS]
+    except Exception as e:
+        logger.error(f"Error extracting PDF text: {str(e)}")
+        return ""
+
 def sync_parse_large_content(content, instructions, model=None, progress_callback=None):
     """Synchronous wrapper for parse_large_content"""
     try:

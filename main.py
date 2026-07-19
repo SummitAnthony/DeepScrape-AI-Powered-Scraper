@@ -1,6 +1,14 @@
 import streamlit as st
 from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf
-from parse import sync_parse_with_deepseek as parse_with_ollama, get_ollama_status, get_available_models, sync_parse_large_content
+from parse import (
+    sync_parse_with_deepseek as parse_with_ollama,
+    get_ollama_status,
+    get_available_models,
+    sync_parse_large_content,
+    stream_generate,
+    sync_extract_pdf_text,
+    MAX_CONTENT_CHARS,
+)
 import time
 import os
 import base64
@@ -567,10 +575,21 @@ def scraping_section():
                     st.error(ollama_status["message"])
                 else:
                     try:
-                        with st.spinner("Extracting text and analyzing..."):
-                            result = parse_with_ollama(selected_pdfs, pdf_prompt, st.session_state.get('ollama_model'))
-                        st.markdown("#### Result")
-                        st.markdown(result)
+                        with st.spinner("Extracting text from PDFs..."):
+                            pdf_text = sync_extract_pdf_text(selected_pdfs)
+                        if not pdf_text:
+                            st.error("Could not extract any text from the selected PDFs")
+                        else:
+                            prompt = f"""Analyze the following PDF content and provide a response based on the user's instructions.
+
+PDF content:
+{pdf_text}
+
+User's instructions: {pdf_prompt}
+
+Provide a clear, well-formatted response that directly addresses the user's request."""
+                            st.markdown("#### Result")
+                            st.write_stream(stream_generate(prompt, st.session_state.get('ollama_model')))
                     except Exception as e:
                         st.error(f"Error analyzing PDFs: {str(e)}")
                         logger.error(f"PDF analysis error: {str(e)}")
@@ -643,25 +662,32 @@ def scraping_section():
                                         for content in section['content']:
                                             content_text += f"{content}\n\n"
                             
-                            # Map-reduce for large content, single call otherwise
-                            chunk_status = st.empty()
+                            model = st.session_state.get('ollama_model')
+                            if len(content_text) <= MAX_CONTENT_CHARS:
+                                # Single call: stream the response live
+                                prompt = f"""Content to analyze:
+{content_text}
 
-                            def show_chunk_progress(done, total):
-                                chunk_status.text(f"Analyzing chunk {done} of {total}...")
+User's instructions: {llm_prompt}
 
-                            result = sync_parse_large_content(
-                                content_text,
-                                llm_prompt,
-                                st.session_state.get('ollama_model'),
-                                show_chunk_progress
-                            )
-                            chunk_status.empty()
-                            
-                            if result and not result.startswith("Error:"):
+Provide a clear, well-formatted response that directly addresses the user's request."""
                                 st.markdown("### Processed Result")
-                                st.markdown(result)
+                                st.write_stream(stream_generate(prompt, model))
                             else:
-                                st.error(result if result else "No result returned from LLM processing")
+                                # Map-reduce for large content
+                                chunk_status = st.empty()
+
+                                def show_chunk_progress(done, total):
+                                    chunk_status.text(f"Analyzing chunk {done} of {total}...")
+
+                                result = sync_parse_large_content(content_text, llm_prompt, model, show_chunk_progress)
+                                chunk_status.empty()
+
+                                if result and not result.startswith("Error:"):
+                                    st.markdown("### Processed Result")
+                                    st.markdown(result)
+                                else:
+                                    st.error(result if result else "No result returned from LLM processing")
                     except Exception as e:
                         st.error(f"Error during LLM processing: {str(e)}")
                         logger.error(f"LLM processing error: {str(e)}")
