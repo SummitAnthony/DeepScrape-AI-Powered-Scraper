@@ -461,138 +461,77 @@ def scraping_section():
         if not url:
             st.error("Please enter a valid URL")
             return
-            
+
         try:
             with st.spinner("Scraping in progress..."):
                 if scraping_mode == "Scrape Website":
                     data = scrape_website_content(url)
                     st.session_state.scraped_data = data
-                    
-                    # Display scraped content
-                    st.markdown("### Scraped Content")
-                    st.markdown(f"**Title:** {data['title']}")
-                    
-                    # Display headings
-                    if data['headings']:
-                        st.markdown("#### Headings")
-                        for heading in data['headings']:
-                            st.markdown(f"- {heading['text']}")
-                    
-                    # Display paragraphs
-                    if data['paragraphs']:
-                        st.markdown("#### Content")
-                        for p in data['paragraphs']:
-                            st.markdown(p)
-                    
-                    # Display images
-                    if data['images']:
-                        st.markdown("#### Images")
-                        cols = st.columns(3)
-                        for i, img in enumerate(data['images']):
-                            with cols[i % 3]:
-                                st.image(img['src'], caption=img['alt'])
-                    
                 else:  # Scrape for PDF
-                    try:
-                        with st.spinner("Searching for PDF files..."):
-                            st.write("Debug: Starting PDF search...")
-                            # Get all PDF links from the website
-                            pdf_links = scrape_website(url)
-                            
-                            if pdf_links:
-                                st.success(f"Found {len(pdf_links)} PDF files!")
-                                
-                                # Store PDF links in session state
-                                st.session_state.pdf_links = pdf_links
-                                
-                                # Display found PDFs
-                                st.markdown("### Found PDF Files")
-                                for i, link in enumerate(pdf_links, 1):
-                                    st.markdown(f"{i}. {link}")
-                                
-                                # Add download options
-                                st.markdown("### Download Options")
-                                
-                                # Option to download all PDFs
-                                if st.button("Download All PDFs", key="download_all"):
-                                    try:
-                                        # Get download directory from user
-                                        download_dir = get_download_directory()
-                                        
-                                        if download_dir:
-                                            # Create the directory if it doesn't exist
-                                            os.makedirs(download_dir, exist_ok=True)
-                                            
-                                            with st.spinner("Preparing downloads..."):
-                                                # Download PDFs with progress tracking
-                                                successful_downloads, failed_downloads = download_pdfs_with_progress(pdf_links, download_dir)
-                                                
-                                                # Show results
-                                                if successful_downloads:
-                                                    st.success(f"Successfully downloaded {len(successful_downloads)} PDFs!")
-                                                    st.markdown("#### Downloaded Files:")
-                                                    for filepath in successful_downloads:
-                                                        st.markdown(f"- {filepath}")
-                                                
-                                                if failed_downloads:
-                                                    st.warning(f"Failed to download {len(failed_downloads)} PDFs:")
-                                                    for link in failed_downloads:
-                                                        st.markdown(f"- {link}")
-                                        else:
-                                            st.warning("No download location selected. Downloads cancelled.")
-                                    
-                                    except Exception as e:
-                                        st.error(f"Error during batch download: {str(e)}")
-                                        logger.error(f"Batch download error: {str(e)}")
-                                
-                                # Option to download individual PDFs
-                                st.markdown("### Download Individual PDFs")
-                                for i, link in enumerate(pdf_links, 1):
-                                    col1, col2 = st.columns([3, 1])
-                                    with col1:
-                                        st.markdown(f"{i}. {link}")
-                                    with col2:
-                                        if st.button(f"Download #{i}", key=f"download_{i}"):
-                                            try:
-                                                # Get download directory from user
-                                                download_dir = get_download_directory()
-                                                
-                                                if download_dir:
-                                                    # Create the directory if it doesn't exist
-                                                    os.makedirs(download_dir, exist_ok=True)
-                                                    
-                                                    with st.spinner(f"Downloading PDF #{i}..."):
-                                                        # Clean and validate the link
-                                                        if 'download_file.php' in link:
-                                                            try:
-                                                                actual_url = link.split('files=')[1]
-                                                                link = actual_url
-                                                            except:
-                                                                pass
-                                                        
-                                                        st.write(f"Debug: Downloading from {link}")
-                                                        filepath = download_pdf(link, download_dir)
-                                                        
-                                                        if filepath:
-                                                            st.success(f"Downloaded successfully to: {filepath}")
-                                                        else:
-                                                            st.error("Download failed")
-                                                else:
-                                                    st.warning("No download location selected. Download cancelled.")
-                                            except Exception as e:
-                                                st.error(f"Error downloading PDF: {str(e)}")
-                                                logger.error(f"Individual download error: {str(e)}")
-                            else:
-                                st.warning("No PDF files found on this page.")
-                    
-                    except Exception as e:
-                        st.error(f"Error during PDF scraping: {str(e)}")
-                        logger.error(f"PDF scraping error: {str(e)}")
-                        return
-        
+                    pdf_links = scrape_website(url)
+                    st.session_state.pdf_links = pdf_links
+                    if not pdf_links:
+                        st.warning("No PDF files found on this page.")
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
+            logger.error(f"Scraping error: {str(e)}")
             return
+
+    # Display scraped website content (persists across reruns)
+    if st.session_state.scraped_data:
+        data = st.session_state.scraped_data
+        st.markdown("### Scraped Content")
+        st.markdown(f"**Title:** {data['title']}")
+
+        if data['headings']:
+            st.markdown("#### Headings")
+            for heading in data['headings']:
+                st.markdown(f"- {heading['text']}")
+
+        if data['paragraphs']:
+            st.markdown("#### Content")
+            for p in data['paragraphs']:
+                st.markdown(p)
+
+        if data['images']:
+            st.markdown("#### Images")
+            cols = st.columns(3)
+            for i, img in enumerate(data['images']):
+                with cols[i % 3]:
+                    st.image(img['src'], caption=img['alt'])
+
+    # Display found PDFs with download options (persists across reruns)
+    if st.session_state.get('pdf_links'):
+        pdf_links = st.session_state.pdf_links
+        st.success(f"Found {len(pdf_links)} PDF files!")
+
+        st.markdown("### Found PDF Files")
+        for i, link in enumerate(pdf_links, 1):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"{i}. {link}")
+            with col2:
+                if st.button(f"Download #{i}", key=f"download_{i}"):
+                    try:
+                        download_dir = get_download_directory()
+                        if download_dir:
+                            os.makedirs(download_dir, exist_ok=True)
+                            with st.spinner(f"Downloading PDF #{i}..."):
+                                if 'download_file.php' in link:
+                                    try:
+                                        link = link.split('files=')[1]
+                                    except IndexError:
+                                        pass
+                                filepath = download_pdf(link, download_dir)
+                                if filepath:
+                                    st.success(f"Downloaded successfully to: {filepath}")
+                                else:
+                                    st.error("Download failed")
+                        else:
+                            st.warning("No download location selected. Download cancelled.")
+                    except Exception as e:
+                        st.error(f"Error downloading PDF: {str(e)}")
+                        logger.error(f"Individual download error: {str(e)}")
 
     # Add LLM interaction section
     if st.session_state.scraped_data:
@@ -619,7 +558,6 @@ def scraping_section():
             llm_prompt = st.text_area(
                 "Processing Instructions",
                 placeholder="Example: Summarize the content, organize by topics, extract key points, show in tabular format...",
-                value=st.session_state.llm_prompt,
                 key="llm_prompt"
             )
             
