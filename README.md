@@ -35,6 +35,7 @@ No separate Chrome/ChromeDriver install needed — Playwright manages its own he
   - Streaming responses render live as they're generated
   - Large content is automatically chunked and analyzed map-reduce style
   - Pick any locally installed Ollama model from the sidebar
+- **Visual Analysis**: Screenshot a full page and analyze it with a vision model (llava) — reads charts, images, and layout that text scraping misses
 - **Structured Extraction**: Give a list of fields (e.g. `name, price, date`) and get a table with CSV/JSON export
 - **Scrape History**: Every job (URL, mode, items found, time) is logged to SQLite and shown in a sidebar panel with one-click re-run
 - **Page Caching**: Scraped pages are cached on disk (1h TTL) so re-analysis is instant

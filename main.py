@@ -13,6 +13,7 @@ from parse import (
 from rag import index_pdfs, retrieve, build_rag_prompt, DEFAULT_EMBED_MODEL
 from watch import check_url
 from history import log_job, list_jobs
+from vision import screenshot_page, analyze_image, DEFAULT_VISION_MODEL
 import time
 import os
 import base64
@@ -613,6 +614,28 @@ def scraping_section():
             for i, img in enumerate(data['images']):
                 with cols[i % 3]:
                     st.image(img['src'], caption=img['alt'])
+
+        # Vision analysis: screenshot the page and ask a multimodal model about it
+        st.markdown("### 👁️ Visual Analysis")
+        st.caption(f"Captures a full-page screenshot and analyzes it with a vision model ({DEFAULT_VISION_MODEL}). Great for charts, images, and visual layout.")
+        with st.form(key="vision_form"):
+            vision_prompt = st.text_input("What should the AI look for?",
+                                          value="Describe this page, including any charts, images, and key visual information.")
+            if st.form_submit_button("Analyze page visually"):
+                current = data.get('metadata', {}).get('url') or st.session_state.get('current_url')
+                if not current:
+                    st.error("No page URL available to screenshot.")
+                else:
+                    try:
+                        with st.spinner("Capturing screenshot and analyzing..."):
+                            shot = screenshot_page(current)
+                            st.image(shot, caption="Captured page")
+                            result = analyze_image(shot, vision_prompt, st.session_state.get('ollama_model'))
+                        st.markdown("#### Result")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"Visual analysis failed: {str(e)}")
+                        logger.error(f"Vision error: {str(e)}")
 
     # Display found PDFs with download options (persists across reruns)
     if st.session_state.get('pdf_links'):
