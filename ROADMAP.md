@@ -4,7 +4,6 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order)
 
-- [ ] **Chunked map-reduce analysis**: for content larger than the context window, split (reuse `split_dom_content`), summarize chunks, then combine. Show progress.
 - [ ] **Streaming responses**: stream Ollama output into the UI (`st.write_stream`) instead of blocking for minutes.
 - [ ] **Structured extraction**: user provides fields (e.g. "name, price, date") → prompt LLM to return JSON → render table + CSV/JSON download buttons.
 - [ ] **Deep crawl mode**: follow same-domain links to depth N (default 1), respect robots.txt, dedupe URLs, aggregate PDFs/content across pages. Concurrent downloads via ThreadPoolExecutor.
@@ -13,6 +12,7 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Done
 
+- [x] **Chunked map-reduce analysis**: split → per-chunk analysis with progress → merge; deduped HTTP into _generate — `97bb2ec`
 - [x] **Model picker**: sidebar dropdown from Ollama /api/tags, model threaded through all LLM calls — `a2b3ddb`
 - [x] **Headless + fast scraping**: requests-first, headless Selenium fallback, no per-image sleep — `c94391a`
 - [x] **Wire PDFs into the AI layer**: PDF text extraction feeds Ollama; new Analyze Downloaded PDFs UI — `5e57534`
