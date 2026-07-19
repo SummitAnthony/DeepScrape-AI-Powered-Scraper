@@ -156,8 +156,28 @@ async def parse_with_ollama(pdf_paths, description):
         logger.error(f"Ollama is not available: {message}")
         return message
 
+    # Extract text from any provided PDFs and include it in the prompt
+    pdf_text = ""
+    if pdf_paths:
+        texts = await process_pdf_files(pdf_paths)
+        for path, text in zip(pdf_paths, texts):
+            if text:
+                pdf_text += f"\n--- {os.path.basename(path)} ---\n{text}"
+
     # Prepare the prompt for the API
-    prompt = f"""Analyze the following content and provide a response based on the user's instructions:
+    if pdf_text:
+        # Cap length to stay within the model's context window
+        pdf_text = pdf_text[:24000]
+        prompt = f"""Analyze the following PDF content and provide a response based on the user's instructions.
+
+PDF content:
+{pdf_text}
+
+User's instructions: {description}
+
+Provide a clear, well-formatted response that directly addresses the user's request."""
+    else:
+        prompt = f"""Analyze the following content and provide a response based on the user's instructions:
 
 {description}
 

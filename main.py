@@ -415,6 +415,8 @@ def download_pdfs_with_progress(pdf_links, download_dir):
             
             if filepath:
                 successful_downloads.append(filepath)
+                if filepath not in st.session_state.downloaded_pdfs:
+                    st.session_state.downloaded_pdfs.append(filepath)
                 st.write(f"Debug: Successfully downloaded to {filepath}")
             else:
                 failed_downloads.append(link)
@@ -524,6 +526,8 @@ def scraping_section():
                                         pass
                                 filepath = download_pdf(link, download_dir)
                                 if filepath:
+                                    if filepath not in st.session_state.downloaded_pdfs:
+                                        st.session_state.downloaded_pdfs.append(filepath)
                                     st.success(f"Downloaded successfully to: {filepath}")
                                 else:
                                     st.error("Download failed")
@@ -532,6 +536,37 @@ def scraping_section():
                     except Exception as e:
                         st.error(f"Error downloading PDF: {str(e)}")
                         logger.error(f"Individual download error: {str(e)}")
+
+    # AI analysis of downloaded PDFs
+    if st.session_state.downloaded_pdfs:
+        st.markdown("### Analyze Downloaded PDFs")
+        selected_pdfs = st.multiselect(
+            "Select PDFs to analyze",
+            st.session_state.downloaded_pdfs,
+            default=st.session_state.downloaded_pdfs
+        )
+        with st.form(key="pdf_llm_form"):
+            pdf_prompt = st.text_area(
+                "What do you want to know about these PDFs?",
+                placeholder="Example: Summarize each document, extract key findings, compare the papers...",
+                key="pdf_llm_prompt"
+            )
+            if st.form_submit_button("Analyze PDFs"):
+                if not pdf_prompt:
+                    st.error("Please enter a question or instructions")
+                elif not selected_pdfs:
+                    st.error("Please select at least one PDF")
+                elif not ollama_status["available"]:
+                    st.error(ollama_status["message"])
+                else:
+                    try:
+                        with st.spinner("Extracting text and analyzing..."):
+                            result = parse_with_ollama(selected_pdfs, pdf_prompt)
+                        st.markdown("#### Result")
+                        st.markdown(result)
+                    except Exception as e:
+                        st.error(f"Error analyzing PDFs: {str(e)}")
+                        logger.error(f"PDF analysis error: {str(e)}")
 
     # Add LLM interaction section
     if st.session_state.scraped_data:
