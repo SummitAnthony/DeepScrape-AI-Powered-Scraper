@@ -53,3 +53,6 @@ rag_index.db
 
 # Watch history
 watch_history.db
+
+# Proxy list (user-provided)
+proxies.txt

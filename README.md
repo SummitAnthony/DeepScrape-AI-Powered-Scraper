@@ -6,11 +6,12 @@ How to - https://www.youtube.com/watch?v=plZyfU9T70Q
 
 ## How It Works
 
-Every page fetch goes through a three-tier pipeline:
+Every page fetch goes through a four-tier pipeline:
 
 1. **Disk cache** — pages already scraped in the last hour are served instantly
 2. **Plain requests** — fast path, no browser needed for static pages
-3. **Headless Chromium (Playwright)** — automatic fallback for JavaScript-heavy pages
+3. **TLS impersonation (curl_cffi)** — mimics a real Chrome TLS fingerprint to get past anti-bot blocks, with optional proxy rotation
+4. **Headless Chromium (Playwright)** — final fallback for JavaScript-heavy pages
 
 AI features run fully locally through [Ollama](https://ollama.ai/) — no API keys, no data leaves your machine.
 
@@ -24,7 +25,8 @@ No separate Chrome/ChromeDriver install needed — Playwright manages its own he
 
 ## Features
 
-- **Fast Scraping**: Plain-requests fetching with automatic headless-Chrome fallback for JS-heavy pages
+- **Fast Scraping**: Four-tier fetch pipeline (cache → requests → TLS impersonation → headless browser)
+- **Anti-Bot Resilience**: curl_cffi TLS fingerprint impersonation gets past common bot blocks; add a `proxies.txt` (one proxy per line) to rotate proxies per request
 - **Deep Crawl**: Follow same-domain links up to depth 3 (respects robots.txt) to find PDFs across a whole site
 - **PDF Scraping**: Automatically finds and downloads PDF files from websites
 - **Concurrent Batch Download**: Download multiple PDFs in parallel with progress tracking

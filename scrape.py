@@ -65,8 +65,49 @@ def fetch_html(url, timeout=15):
             return None
         return response.text
     except Exception as e:
-        logger.info(f"requests fetch failed ({e}); falling back to headless browser")
+        logger.info(f"requests fetch failed ({e}); trying TLS-impersonation tier")
         return None
+
+def fetch_html_impersonate(url, proxy=None):
+    """Fetch HTML impersonating a real browser's TLS fingerprint via curl_cffi.
+    Returns HTML string, or None to fall back to the headless browser."""
+    try:
+        from curl_cffi import requests as cffi_requests
+    except ImportError:
+        logger.info("curl_cffi not installed; skipping impersonation tier")
+        return None
+    try:
+        proxies = {"http": proxy, "https": proxy} if proxy else None
+        response = cffi_requests.get(url, impersonate="chrome", timeout=20, proxies=proxies)
+        response.raise_for_status()
+        if 'html' not in response.headers.get('Content-Type', '').lower():
+            return None
+        return response.text
+    except Exception as e:
+        logger.info(f"impersonation fetch failed ({e}); falling back to headless browser")
+        return None
+
+def load_proxies(path="proxies.txt"):
+    """Load a proxy list (one per line, # comments allowed). Missing file -> []."""
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding='utf-8') as f:
+        return [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+
+class ProxyRotator:
+    """Round-robin over a proxy pool. next() returns None when the pool is empty."""
+    def __init__(self, proxies):
+        self.proxies = list(proxies)
+        self._i = 0
+    def next(self):
+        if not self.proxies:
+            return None
+        proxy = self.proxies[self._i % len(self.proxies)]
+        self._i += 1
+        return proxy
+
+# Module-level rotator, populated from proxies.txt at import
+_proxy_rotator = ProxyRotator(load_proxies())
 
 def create_download_folder(base_folder="downloads"):
     """Create the download folder if it doesn't exist"""
@@ -203,7 +244,7 @@ def _browser_fetch(url):
             browser.close()
 
 def get_page_html(website, use_cache=True, browser_fetcher=None):
-    """Get page HTML: disk cache first, then plain requests, then headless browser."""
+    """Get page HTML through tiers: cache -> requests -> TLS impersonation -> headless browser."""
     if use_cache:
         cached = _cache_get(website)
         if cached is not None:
@@ -213,8 +254,12 @@ def get_page_html(website, use_cache=True, browser_fetcher=None):
     if html is not None:
         logger.info("Fetched page via requests (fast path)")
     else:
-        fetcher = browser_fetcher or _browser_fetch
-        html = fetcher(website)
+        html = fetch_html_impersonate(website, proxy=_proxy_rotator.next())
+        if html is not None:
+            logger.info("Fetched page via TLS impersonation")
+        else:
+            fetcher = browser_fetcher or _browser_fetch
+            html = fetcher(website)
 
     _cache_put(website, html)
     return html
