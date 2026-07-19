@@ -1,152 +1,182 @@
-# DeepScrape — AI-Powered Scraper & Analyzer
+<div align="center">
 
-A powerful web application that combines fast web scraping, site crawling, and local-AI analysis (Ollama) to extract, download, and understand web content and PDF documents.
+# 🔍 DeepScrape
 
-How to - https://www.youtube.com/watch?v=plZyfU9T70Q
+### AI-Powered Web Scraper & Document Intelligence Platform
 
-## How It Works
+**Scrape any site → harvest documents → ask AI anything about them.** Runs 100% locally.
 
-Every page fetch goes through a four-tier pipeline:
+[![tests](https://github.com/SummitAnthony/DeepScrape-AI-Powered-Scraper/actions/workflows/tests.yml/badge.svg)](https://github.com/SummitAnthony/DeepScrape-AI-Powered-Scraper/actions/workflows/tests.yml)
+![python](https://img.shields.io/badge/python-3.8%2B-blue)
+![tests](https://img.shields.io/badge/tests-153%20passing-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-green)
+![AI](https://img.shields.io/badge/AI-local%20via%20Ollama-orange)
 
-1. **Disk cache** — pages already scraped in the last hour are served instantly
-2. **Plain requests** — fast path, no browser needed for static pages
-3. **TLS impersonation (curl_cffi)** — mimics a real Chrome TLS fingerprint to get past anti-bot blocks, with optional proxy rotation
-4. **Headless Chromium (Playwright)** — final fallback for JavaScript-heavy pages
+</div>
 
-AI features run fully locally through [Ollama](https://ollama.ai/) — no API keys, no data leaves your machine.
+---
 
-## System Requirements
+DeepScrape started as a simple PDF downloader and grew — across five test-driven build rounds — into a full document-intelligence toolkit. It fetches even bot-protected and login-walled pages, harvests PDFs/DOCX/XLSX/CSV, and lets you **chat with what it finds** using a local LLM. No API keys, no cloud, nothing leaves your machine.
 
-- Python 3.8 or higher
-- Windows 10/11 (64-bit), macOS, or Linux
-- [Ollama](https://ollama.ai/) with at least one model pulled (for AI features)
+Use it three ways: a **Streamlit web app**, a **REST API**, or a **command-line tool**.
 
-No separate Chrome/ChromeDriver install needed — Playwright manages its own headless Chromium.
+## ✨ Highlights
 
-## Features
+- 🧠 **Chat with your documents** — RAG over harvested files with source citations and multi-turn memory
+- 👁️ **Vision analysis** — screenshots a page and reads its charts, images, and layout with a vision model
+- 🛡️ **Gets past defenses** — TLS-fingerprint impersonation, proxy rotation, and cookie/header auth for login-walled pages
+- 🕸️ **Smart crawling** — the AI decides which links to follow toward *your* goal; or ingest a whole site via `sitemap.xml`
+- 📊 **Structured extraction** — turn any page into a table (name, price, date…) with a majority-vote "tournament" mode for accuracy
+- 🔔 **Hands-free monitoring** — watch pages on a schedule and get Slack/Discord alerts when they change
+- 🔒 **Fully local & private** — all AI runs through [Ollama](https://ollama.ai/) on your own hardware
 
-- **Fast Scraping**: Four-tier fetch pipeline (cache → requests → TLS impersonation → headless browser)
-- **Anti-Bot Resilience**: curl_cffi TLS fingerprint impersonation gets past common bot blocks; add a `proxies.txt` (one proxy per line) to rotate proxies per request
-- **Authenticated Scraping**: drop a `cookies.json` (`{"cookies": {...}, "headers": {...}}`) and DeepScrape injects it across all fetch tiers to reach login-walled pages
-- **Deep Crawl**: Follow same-domain links up to depth 3 (respects robots.txt) to find PDFs across a whole site
-- **Sitemap Ingestion**: Instantly discover every URL on a site by reading its `sitemap.xml` (handles nested sitemap indexes) — no crawling required
-- **Multi-Format Harvesting**: Finds and downloads PDF, DOCX, XLSX, and CSV files — all extractable for AI analysis and RAG chat
-- **Concurrent Batch Download**: Download multiple PDFs in parallel with progress tracking
-- **AI Analysis**: Ask anything about scraped content or downloaded PDFs (requires Ollama)
-  - Streaming responses render live as they're generated
-  - Large content is automatically chunked and analyzed map-reduce style
-  - Multi-turn memory: PDF chat remembers earlier questions (budget-trimmed) so follow-ups keep context
-  - Pick any locally installed Ollama model from the sidebar
-- **Visual Analysis**: Screenshot a full page and analyze it with a vision model (llava) — reads charts, images, and layout that text scraping misses
-- **Structured Extraction**: Give a list of fields (e.g. `name, price, date`) and get a table with CSV/JSON export
-  - **High-accuracy tournament mode**: runs the extraction 3× and majority-votes the records, keeping only what the runs agree on
-- **Scheduled Watch Runner**: `python watch_runner.py` re-checks every watched URL in one batch and reports changes — cron it (or Task Scheduler) to monitor pages automatically
-- **Webhook Alerts**: Set `DEEPSCRAPE_WEBHOOK_URL` (Slack/Discord/generic) and the watch runner posts a change alert whenever a monitored page updates
-- **Scrape History**: Every job (URL, mode, items found, time) is logged to SQLite and shown in a sidebar panel with one-click re-run
-- **Page Caching**: Scraped pages are cached on disk (1h TTL) so re-analysis is instant
-- **REST API**: A FastAPI server (`api.py`) exposes `/scrape`, `/pdfs`, and `/extract` so scripts and other tools can use the pipeline programmatically — run `uvicorn api:app` and see `/docs`
-- **CLI**: Drive the pipeline from the terminal and pipe JSON into other tools — `python cli.py scrape <url>`, `python cli.py pdfs <url>`, `python cli.py extract <url> --fields "name,price"`
-- **Custom Download Location**: Choose where to save downloaded files
+## 🏗️ How It Works
 
-## Local Installation
+Every page fetch cascades through a four-tier pipeline — it only escalates to a heavier tier when the lighter one is blocked, so static pages are instant and hard pages still get through:
 
-### Installation Steps
+```mermaid
+flowchart LR
+    A[URL] --> B{Disk cache<br/>≤1h old?}
+    B -->|hit| Z[HTML]
+    B -->|miss| C[Plain requests<br/>+ auth cookies]
+    C -->|blocked| D[TLS impersonation<br/>curl_cffi + proxies]
+    D -->|blocked| E[Headless Chromium<br/>Playwright]
+    C -->|ok| Z
+    D -->|ok| Z
+    E --> Z
+    Z --> F[AI Pipeline<br/>Ollama]
+```
 
-1. Clone the repository:
+## 🚀 Quick Start
+
 ```bash
+# 1. Clone & install
 git clone https://github.com/SummitAnthony/DeepScrape-AI-Powered-Scraper.git
 cd DeepScrape-AI-Powered-Scraper
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install required packages:
-```bash
 pip install -r requirements.txt
-```
-
-4. Install the headless browser (used only for JavaScript-heavy pages):
-```bash
 playwright install chromium
-```
 
-5. Install Ollama (for AI features):
-- Download and install from [Ollama's website](https://ollama.ai/)
-- Pull at least one model (you can switch between installed models from the app's sidebar):
-```bash
+# 2. Install a local model (for AI features)
+#    Get Ollama from https://ollama.ai, then:
 ollama pull llama3
+ollama pull nomic-embed-text   # for RAG chat
+
+# 3. Launch the web app
+streamlit run main.py
 ```
 
-6. Run the application:
+## 🖥️ Three Ways to Use It
+
+**Web app** — the full experience with live-streaming AI, RAG chat, and visual analysis:
 ```bash
 streamlit run main.py
 ```
 
-## Troubleshooting
+**Command line** — drive the pipeline from your terminal, pipe JSON anywhere:
+```bash
+python cli.py scrape  https://example.com
+python cli.py pdfs    https://example.com
+python cli.py extract https://example.com --fields "name,price,date"
+```
 
-1. **"Executable doesn't exist" / browser errors**: Run `playwright install chromium`
-2. **AI features not working**: Make sure Ollama is running (`ollama serve`) and a model is pulled
-3. **RAG chat indexing fails**: Pull the embedding model — `ollama pull nomic-embed-text`
-4. **Permission errors**: Run as administrator if needed
+**REST API** — integrate DeepScrape into any app or script:
+```bash
+uvicorn api:app          # interactive docs at http://localhost:8000/docs
+```
+```bash
+curl -X POST localhost:8000/extract \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "fields": ["name", "price"]}'
+```
 
-## Usage
+## 🧩 Full Feature Set
 
-1. Open the application (locally)
-2. Choose your scraping mode:
-   - **Scrape Website**: Extract and analyze website content
-   - **Scrape for PDF**: Find and download PDF files
+### Fetching & Access
+- **Four-tier pipeline** — cache → requests → TLS impersonation → headless Chromium (Playwright)
+- **Anti-bot resilience** — `curl_cffi` Chrome TLS fingerprint + per-request proxy rotation via `proxies.txt`
+- **Authenticated scraping** — drop a `cookies.json` (`{"cookies": {...}, "headers": {...}}`), injected across every tier
+- **Page caching** — scraped pages cached on disk (1h TTL) so re-analysis is instant
 
-3. Enter a website URL and click "Start Scraping"
+### Discovery & Harvesting
+- **Deep crawl** — follow same-domain links to depth 3, respecting `robots.txt`
+- **AI smart crawl** — give a goal ("find 2024 exam papers") and the LLM ranks which links to follow
+- **Sitemap ingestion** — read `sitemap.xml` (incl. nested indexes) for instant whole-site URL discovery
+- **Multi-format harvesting** — download **PDF, DOCX, XLSX, CSV** concurrently, all extractable for AI
 
-4. For PDF scraping:
-   - Optionally set a crawl depth to also scan linked pages on the same domain
-   - View the list of found PDFs
-   - Choose to download all PDFs (concurrent) or individual files
-   - Select your preferred download location
-   - Use "Analyze Downloaded PDFs" to ask the AI about their contents
+### AI Intelligence (100% local via Ollama)
+- **Chat with content or documents** — live-streaming answers, any installed model
+- **RAG chat** — chunk → embed → SQLite vector store → **cited answers** with multi-turn memory
+- **Map-reduce analysis** — oversized content is chunked, analyzed, and merged automatically
+- **Structured extraction** — fields → JSON → table with CSV/JSON export, plus **tournament mode** (extract 3×, majority-vote for accuracy)
+- **Visual analysis** — full-page screenshot analyzed by a vision model (llava) for charts & layout
 
-5. For website content:
-   - Process the content with free-form instructions (streams live)
-   - Or use "Structured Extraction" to pull specific fields into a downloadable table
+### Automation & Monitoring
+- **Watch mode** — snapshot a page and diff added/removed content between checks
+- **Scheduled runner** — `python watch_runner.py` batch-checks all watched URLs (cron / Task Scheduler friendly)
+- **Webhook alerts** — set `DEEPSCRAPE_WEBHOOK_URL` for Slack/Discord/generic notifications on change
+- **Scrape history** — every job logged to SQLite with one-click re-run in the UI
 
-## Project Structure
+## 🧪 Built Test-First
+
+DeepScrape was developed across **5 iterative build rounds**, every feature shipped red-green TDD:
+
+| | |
+|---|---|
+| ✅ **153 tests** | across 18 test suites, all passing |
+| 🔄 **CI on every push** | GitHub Actions runs the full suite |
+| 📦 **12 focused modules** | clean separation: fetch, parse, RAG, vision, watch, API, CLI |
+
+```bash
+python -m pytest -q      # run the full suite
+```
+
+## 📁 Project Structure
 
 ```
 DeepScrape-AI-Powered-Scraper/
-├── main.py                   # Streamlit UI: scraping, downloads, AI analysis, extraction, RAG chat
-├── scrape.py                 # Fetch pipeline (cache/requests/Playwright), crawler, PDF downloads
-├── parse.py                  # Ollama integration: streaming, map-reduce, structured extraction
-├── rag.py                    # RAG: chunking, embeddings, SQLite vector store, cited answers
-├── watch.py                  # Watch mode: page snapshots + change diffing
-├── history.py                # Scrape-history job log (SQLite)
-├── api.py                    # FastAPI server: /scrape, /pdfs, /extract endpoints
-├── tests/                    # pytest suite (run: python -m pytest -q)
-├── setup.bat                 # Windows one-shot setup helper
-├── requirements.txt          # Python dependencies
-├── ROADMAP.md                # Improvement log (what shipped, what's next)
-├── README.md                 # Project documentation
-└── .gitignore                # Ignores downloads/, outputs/, .page_cache/, etc.
+├── main.py            # Streamlit web app (all features)
+├── cli.py             # Command-line interface
+├── api.py             # FastAPI REST server
+├── scrape.py          # Four-tier fetch pipeline, crawler, sitemap, downloads
+├── parse.py           # Ollama: streaming, map-reduce, structured + tournament extraction
+├── rag.py             # RAG: chunking, embeddings, SQLite vector store, cited answers
+├── vision.py          # Screenshot + vision-model analysis
+├── conversation.py    # Multi-turn chat memory (budget-trimmed)
+├── watch.py           # Page snapshots + change diffing
+├── watch_runner.py    # Scheduled batch watcher
+├── notify.py          # Slack/Discord/generic webhook alerts
+├── history.py         # Scrape-history job log
+├── tests/             # 18 pytest suites (153 tests)
+└── requirements.txt
 ```
 
-At runtime the app also creates `downloads/` (saved PDFs), `outputs/` (exports), and `.page_cache/` (scraped-page cache, 1h TTL) — all gitignored.
+## 🔧 Requirements
 
-## Dependencies
+- **Python 3.8+** · Windows, macOS, or Linux
+- **[Ollama](https://ollama.ai/)** with at least one model pulled (for AI features)
+- Playwright manages its own headless Chromium — **no Chrome/ChromeDriver install needed**
 
-See `requirements.txt` for the full pinned list. Key packages: streamlit, playwright, beautifulsoup4, requests, aiohttp, PyPDF2, pymupdf, fpdf, retrying.
+## 🩹 Troubleshooting
 
-## Contributing
+| Symptom | Fix |
+|---|---|
+| Browser / "executable doesn't exist" errors | `playwright install chromium` |
+| AI features not responding | Ensure `ollama serve` is running and a model is pulled |
+| RAG chat indexing fails | Pull the embedding model: `ollama pull nomic-embed-text` |
+| Visual analysis fails | Pull a vision model: `ollama pull llava` |
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
 
-## License
+Contributions welcome — please open an issue or PR. Run `python -m pytest -q` before submitting.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📄 License
 
-## Acknowledgments
+MIT — see [LICENSE](LICENSE).
 
-- [Ollama](https://ollama.ai/) for AI capabilities
-- [Playwright](https://playwright.dev/) for headless browser automation
+## 🙏 Acknowledgments
+
+[Ollama](https://ollama.ai/) · [Playwright](https://playwright.dev/) · [Streamlit](https://streamlit.io/) · [FastAPI](https://fastapi.tiangolo.com/)
+
+<div align="center">
+<sub>Built locally, runs locally, your data stays yours.</sub>
+</div>
