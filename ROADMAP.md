@@ -4,7 +4,6 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 3 (TDD + update README Features section every iteration)
 
-- [ ] **Anti-bot resilience**: use `curl_cffi` (browser TLS fingerprint impersonation) as a second fetch tier before the Playwright fallback; optional proxy list support (`proxies.txt`, rotate per request). TDD: tier-order + proxy-rotation tests with mocked fetchers.
 - [ ] **Sitemap ingestion**: detect and parse `sitemap.xml` (incl. sitemap-index nesting) for instant full-site URL discovery; feed URLs into crawl/PDF scan. TDD: sitemap XML parsing tests first.
 - [ ] **More file types**: harvest DOCX/XLSX/CSV alongside PDFs (extend `is_download_link` → `classify_download_link`); extract their text for analysis and RAG (python-docx, openpyxl). TDD: classification + extraction tests.
 - [ ] **Scrape-history dashboard**: SQLite job log (url, mode, timestamp, items found); "History" sidebar page listing past jobs with one-click re-run. TDD: job-store tests.
@@ -12,6 +11,7 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Done
 
+- [x] **Anti-bot resilience**: curl_cffi TLS impersonation tier + proxy rotation (7 tests) — `22a3d81`
 - [x] **Watch mode**: SQLite snapshots + line diffs + Watch Page UI (11 tests) — `dbd553c`
 
 - [x] **Smart crawl**: goal-directed link ranking via LLM (10 tests) — `9695f8c`
