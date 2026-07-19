@@ -1,6 +1,6 @@
 import streamlit as st
 from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf
-from parse import sync_parse_with_deepseek as parse_with_ollama, get_ollama_status, get_available_models
+from parse import sync_parse_with_deepseek as parse_with_ollama, get_ollama_status, get_available_models, sync_parse_large_content
 import time
 import os
 import base64
@@ -643,18 +643,19 @@ def scraping_section():
                                         for content in section['content']:
                                             content_text += f"{content}\n\n"
                             
-                            st.write("Debug: Content length:", len(content_text))
-                            
-                            # Create a more specific prompt for the LLM
-                            full_prompt = f"""Content to analyze:
-{content_text}
+                            # Map-reduce for large content, single call otherwise
+                            chunk_status = st.empty()
 
-User's instructions: {llm_prompt}"""
+                            def show_chunk_progress(done, total):
+                                chunk_status.text(f"Analyzing chunk {done} of {total}...")
 
-                            st.write("Debug: Sending to LLM...")
-                            
-                            # Process with LLM
-                            result = parse_with_ollama([], full_prompt, st.session_state.get('ollama_model'))
+                            result = sync_parse_large_content(
+                                content_text,
+                                llm_prompt,
+                                st.session_state.get('ollama_model'),
+                                show_chunk_progress
+                            )
+                            chunk_status.empty()
                             
                             if result and not result.startswith("Error:"):
                                 st.markdown("### Processed Result")

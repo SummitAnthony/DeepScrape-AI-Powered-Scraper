@@ -154,6 +154,97 @@ async def process_pdf_files(pdf_paths):
     results = await asyncio.gather(*tasks)
     return results
 
+async def _generate(prompt, model):
+    """Single Ollama generate call. Returns response text (or an error string)."""
+    data = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "num_predict": 4000,
+            "top_p": 0.9,
+            "top_k": 40
+        }
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            OLLAMA_API_URL,
+            json=data,
+            timeout=300,
+            headers={"Content-Type": "application/json"}
+        ) as response:
+            response_text = await response.text()
+            if response.status != 200:
+                logger.error(f"API error: {response.status} - {response_text}")
+                return f"API error: {response.status}. Please make sure Ollama is running and the model is downloaded."
+            try:
+                result = json.loads(response_text)
+            except json.JSONDecodeError:
+                return f"Error: Invalid response from Ollama API - {response_text[:100]}"
+            if 'response' not in result:
+                return "Error: Unexpected response format from Ollama API"
+            return result['response'].strip()
+
+# Max characters of content per LLM call (rough context-window budget)
+MAX_CONTENT_CHARS = 24000
+
+async def parse_large_content(content, instructions, model=None, progress_callback=None):
+    """Map-reduce analysis: split oversized content into chunks, analyze each,
+    then combine the partial results into one response."""
+    model = model or MODEL_NAME
+    available, message = check_ollama_availability(model)
+    if not available:
+        return message
+
+    chunks = [content[i:i + MAX_CONTENT_CHARS] for i in range(0, len(content), MAX_CONTENT_CHARS)] or [""]
+
+    try:
+        if len(chunks) == 1:
+            prompt = f"""Content to analyze:
+{content}
+
+User's instructions: {instructions}
+
+Provide a clear, well-formatted response that directly addresses the user's request."""
+            return await _generate(prompt, model)
+
+        # Map: analyze each chunk independently
+        partial_results = []
+        for i, chunk in enumerate(chunks):
+            if progress_callback:
+                progress_callback(i + 1, len(chunks))
+            prompt = f"""This is part {i + 1} of {len(chunks)} of a larger document. Extract and summarize everything relevant to the user's instructions from this part only.
+
+Content:
+{chunk}
+
+User's instructions: {instructions}"""
+            partial_results.append(await _generate(prompt, model))
+
+        # Reduce: merge partial analyses
+        combined = "\n\n".join(partial_results)[:MAX_CONTENT_CHARS]
+        reduce_prompt = f"""Below are partial analyses of consecutive parts of one document. Merge them into a single coherent response that follows the user's instructions. Do not mention the parts or the merging process.
+
+Partial analyses:
+{combined}
+
+User's instructions: {instructions}"""
+        return await _generate(reduce_prompt, model)
+
+    except asyncio.TimeoutError:
+        return "Error: The request timed out. Please try again with a more specific question or less content."
+    except Exception as e:
+        return f"Error analyzing content: {str(e)}. Please make sure Ollama is running and properly configured."
+
+def sync_parse_large_content(content, instructions, model=None, progress_callback=None):
+    """Synchronous wrapper for parse_large_content"""
+    try:
+        return asyncio.run(parse_large_content(content, instructions, model, progress_callback))
+    except Exception as e:
+        logger.error(f"Error in sync_parse_large_content: {str(e)}")
+        return f"Error: {str(e)}"
+
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 async def parse_with_ollama(pdf_paths, description, model=None):
     """
@@ -196,44 +287,9 @@ Provide a clear, well-formatted response that directly addresses the user's requ
 
 Provide a clear, well-formatted response that directly addresses the user's request."""
 
-    logger.info(f"Preparing to send request to Ollama API with model: {model}")
-    data = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "num_predict": 4000,
-            "top_p": 0.9,
-            "top_k": 40
-        }
-    }
-
+    logger.info(f"Sending request to Ollama API with model: {model}")
     try:
-        logger.info("Sending request to Ollama API...")
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                OLLAMA_API_URL,
-                json=data,
-                timeout=300,
-                headers={"Content-Type": "application/json"}
-            ) as response:
-                response_text = await response.text()
-                logger.info(f"Response status: {response.status}")
-                
-                if response.status != 200:
-                    logger.error(f"API error: {response.status} - {response_text}")
-                    return f"API error: {response.status}. Please make sure Ollama is running and the model is downloaded."
-                
-                try:
-                    result = json.loads(response_text)
-                    if 'response' not in result:
-                        return "Error: Unexpected response format from Ollama API"
-                    return result['response'].strip()
-                except json.JSONDecodeError as e:
-                    return f"Error: Invalid response from Ollama API - {response_text[:100]}"
-                    
+        return await _generate(prompt, model)
     except asyncio.TimeoutError:
         return "Error: The request timed out. Please try again with a more specific question or less content."
     except Exception as e:
