@@ -2,9 +2,13 @@
 
 One item per iteration. Implement minimally, verify, commit, push, check off.
 
-## Queue (priority order)
+## Queue (priority order) — Round 3 (TDD + update README Features section every iteration)
 
-(empty — rounds 1 and 2 fully shipped)
+- [ ] **Anti-bot resilience**: use `curl_cffi` (browser TLS fingerprint impersonation) as a second fetch tier before the Playwright fallback; optional proxy list support (`proxies.txt`, rotate per request). TDD: tier-order + proxy-rotation tests with mocked fetchers.
+- [ ] **Sitemap ingestion**: detect and parse `sitemap.xml` (incl. sitemap-index nesting) for instant full-site URL discovery; feed URLs into crawl/PDF scan. TDD: sitemap XML parsing tests first.
+- [ ] **More file types**: harvest DOCX/XLSX/CSV alongside PDFs (extend `is_download_link` → `classify_download_link`); extract their text for analysis and RAG (python-docx, openpyxl). TDD: classification + extraction tests.
+- [ ] **Scrape-history dashboard**: SQLite job log (url, mode, timestamp, items found); "History" sidebar page listing past jobs with one-click re-run. TDD: job-store tests.
+- [ ] **API mode**: FastAPI app (`api.py`) exposing /scrape, /pdfs, /extract endpoints reusing the same pipeline. TDD: endpoint tests via TestClient.
 
 ## Done
 
