@@ -1,15 +1,25 @@
-# AI PDF Scraper & Analyzer
+# DeepScrape — AI-Powered Scraper & Analyzer
 
-A powerful web application that combines web scraping with AI analysis to extract and process PDF documents from websites.
+A powerful web application that combines fast web scraping, site crawling, and local-AI analysis (Ollama) to extract, download, and understand web content and PDF documents.
 
 How to - https://www.youtube.com/watch?v=plZyfU9T70Q
+
+## How It Works
+
+Every page fetch goes through a three-tier pipeline:
+
+1. **Disk cache** — pages already scraped in the last hour are served instantly
+2. **Plain requests** — fast path, no browser needed for static pages
+3. **Headless Chrome (Selenium)** — automatic fallback for JavaScript-heavy pages
+
+AI features run fully locally through [Ollama](https://ollama.ai/) — no API keys, no data leaves your machine.
 
 ## System Requirements
 
 - Python 3.8 or higher
-- Google Chrome version 137.0.7151.68 (64-bit)
-- ChromeDriver version 137.0.7151.68
 - Windows 10/11 (64-bit)
+- Google Chrome (any recent version — only needed for JS-heavy pages; the included downloader fetches the matching ChromeDriver automatically)
+- [Ollama](https://ollama.ai/) with at least one model pulled (for AI features)
 
 ## Features
 
@@ -30,11 +40,7 @@ How to - https://www.youtube.com/watch?v=plZyfU9T70Q
 ### 1. Prerequisites
 
 #### Chrome Installation
-- Install Google Chrome version 137.0.7151.68 (64-bit)
-- You can check your Chrome version by:
-  1. Opening Chrome
-  2. Clicking the three dots in the top-right corner
-  3. Going to Help > About Google Chrome
+- Install any recent version of Google Chrome (64-bit). Chrome is only used as a fallback for JavaScript-heavy pages — most scraping runs without it.
 
 #### ChromeDriver Setup
 The application includes an automatic ChromeDriver downloader (`download_chromedriver.py`) that will:
@@ -68,9 +74,9 @@ python download_chromedriver.py
 
 5. Install Ollama (for AI features):
 - Download and install from [Ollama's website](https://ollama.ai/)
-- Pull the desired model (default is "llama2"):
+- Pull at least one model (you can switch between installed models from the app's sidebar):
 ```bash
-ollama pull llama2
+ollama pull llama3
 ```
 
 6. Run the application:
@@ -116,14 +122,18 @@ If you encounter version mismatch errors:
 
 ```
 DeepScrape-AI-Powered-Scraper/
-├── main.py              # Main Streamlit application
-├── scrape.py            # Web scraping functionality
-├── parse.py             # AI processing and analysis
-├── download_chromedriver.py  # ChromeDriver downloader
-├── requirements.txt     # Python dependencies
-├── README.md           # Project documentation
-└── .gitignore          # Git ignore file
+├── main.py                   # Streamlit UI: scraping, downloads, AI analysis, extraction
+├── scrape.py                 # Fetch pipeline (cache/requests/Selenium), crawler, PDF downloads
+├── parse.py                  # Ollama integration: streaming, map-reduce, structured extraction
+├── download_chromedriver.py  # Auto-downloads ChromeDriver matching your Chrome version
+├── setup.bat                 # Windows one-shot setup helper
+├── requirements.txt          # Python dependencies
+├── ROADMAP.md                # Improvement log (what shipped, what's next)
+├── README.md                 # Project documentation
+└── .gitignore                # Ignores downloads/, outputs/, .page_cache/, etc.
 ```
+
+At runtime the app also creates `downloads/` (saved PDFs), `outputs/` (exports), and `.page_cache/` (scraped-page cache, 1h TTL) — all gitignored.
 
 ## Dependencies
 
