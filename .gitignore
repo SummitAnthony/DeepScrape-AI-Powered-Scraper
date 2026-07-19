@@ -45,3 +45,5 @@ geckodriver.exe
 
 # Jupyter Notebook
 .ipynb_checkpoints 
+# Page cache
+.page_cache/
