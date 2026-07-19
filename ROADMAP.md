@@ -4,12 +4,12 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 5: automation & integrations (TDD + update README Features every iteration)
 
-- [ ] **Scheduled watch runner**: a cron-friendly `watch_runner.py` that batch-checks every previously-watched URL, logs changes, and returns a summary; runnable as `python watch_runner.py`. TDD: batch-run logic tests with mocked check_url.
 - [ ] **Webhook notifications**: on a detected change, POST a formatted message to a Slack/Discord/generic webhook (`format_change_message` + `notify_webhook`); wire into the watch runner. TDD: message formatting + POST payload tests with a mocked poster.
 - [ ] **CLI mode**: `cli.py` with argparse subcommands (`scrape`, `pdfs`, `extract`) reusing the pipeline, printing JSON. TDD: argument parsing + command dispatch tests.
 
 ## Done
 
+- [x] **Scheduled watch runner**: cron-friendly batch checker with on_change hook (5 tests) — `78c45ba`
 - [x] **Authenticated scraping**: cookies.json injected across all fetch tiers (6 tests) — `39b5f84`
 - [x] **Tournament extraction**: 3× extraction + majority-vote merge (8 tests) — `7129a57`
 
