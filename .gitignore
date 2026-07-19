@@ -56,3 +56,6 @@ watch_history.db
 
 # Proxy list (user-provided)
 proxies.txt
+
+# Scrape history
+scrape_history.db

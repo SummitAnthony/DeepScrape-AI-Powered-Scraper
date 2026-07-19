@@ -12,6 +12,7 @@ from parse import (
 )
 from rag import index_pdfs, retrieve, build_rag_prompt, DEFAULT_EMBED_MODEL
 from watch import check_url
+from history import log_job, list_jobs
 import time
 import os
 import base64
@@ -280,6 +281,20 @@ with st.sidebar:
         st.selectbox("AI Model", available_models, key="ollama_model")
     else:
         st.warning("No Ollama models found. Is Ollama running?")
+
+    # Scrape history: recent jobs with one-click re-run
+    with st.expander("🕘 Scrape History"):
+        jobs = list_jobs(limit=15)
+        if not jobs:
+            st.caption("No jobs yet.")
+        for i, job in enumerate(jobs):
+            when = datetime.fromtimestamp(job["logged_at"]).strftime("%m-%d %H:%M")
+            st.markdown(f"**{job['mode']}** · {job['items_found']} items · {when}")
+            st.caption(job["url"])
+            if st.button("Re-run", key=f"rerun_{i}"):
+                st.session_state.current_url = job["url"]
+                st.session_state.scraping_mode = job["mode"]
+                st.rerun()
 
     st.markdown("""
     <div class="card">
@@ -559,6 +574,18 @@ def scraping_section():
                     st.session_state.pdf_links = pdf_links
                     if not pdf_links:
                         st.warning("No PDF files found.")
+
+                # Log the job to scrape history
+                try:
+                    if scraping_mode == "Scrape Website":
+                        items = len(st.session_state.scraped_data.get('paragraphs', []))
+                    elif scraping_mode == "Scrape for PDF":
+                        items = len(st.session_state.get('pdf_links') or [])
+                    else:
+                        items = 0
+                    log_job(url, scraping_mode, items)
+                except Exception as e:
+                    logger.error(f"History logging error: {str(e)}")
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
             logger.error(f"Scraping error: {str(e)}")
