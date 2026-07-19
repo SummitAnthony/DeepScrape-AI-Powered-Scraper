@@ -29,26 +29,38 @@ except ImportError:
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "llama2"  # Changed to llama2 as it's more commonly available
 
-def check_ollama_availability():
-    """Check if Ollama is running and available"""
+def get_available_models():
+    """Return the list of locally installed Ollama model names (empty if unreachable)"""
+    try:
+        import requests
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if response.status_code == 200:
+            return [m['name'] for m in response.json().get('models', [])]
+    except Exception as e:
+        logger.warning(f"Could not list Ollama models: {str(e)}")
+    return []
+
+def check_ollama_availability(model=None):
+    """Check if Ollama is running and the model is available"""
+    model = model or MODEL_NAME
     try:
         import requests
         response = requests.get("http://localhost:11434/api/tags", timeout=5)
         if response.status_code == 200:
             # Try to get the list of models
             models = response.json().get('models', [])
-            if not any(model['name'] == MODEL_NAME for model in models):
-                return False, f"Model {MODEL_NAME} is not available. Please run 'ollama pull {MODEL_NAME}'"
-            return True, "Ollama is running and model is available"
+            if not any(m['name'] == model for m in models):
+                return False, f"Model {model} is not available. Please run 'ollama pull {model}'"
+            return True, f"Ollama is running and model {model} is available"
         return False, "Ollama is not responding correctly"
     except requests.exceptions.ConnectionError:
         return False, "Could not connect to Ollama. Please make sure Ollama is running (ollama serve)"
     except Exception as e:
         return False, f"Error connecting to Ollama: {str(e)}"
 
-def get_ollama_status():
+def get_ollama_status(model=None):
     """Get detailed status about Ollama availability"""
-    available, message = check_ollama_availability()
+    available, message = check_ollama_availability(model)
     if not available:
         return {
             "available": False,
@@ -143,15 +155,16 @@ async def process_pdf_files(pdf_paths):
     return results
 
 @retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
-async def parse_with_ollama(pdf_paths, description):
+async def parse_with_ollama(pdf_paths, description, model=None):
     """
     Parse the content using Ollama API based on the provided description.
     Uses async/await for better performance and retry mechanism for reliability.
     """
     logger.info("Starting parse_with_ollama function")
-    
+    model = model or MODEL_NAME
+
     # Check if Ollama is available
-    available, message = check_ollama_availability()
+    available, message = check_ollama_availability(model)
     if not available:
         logger.error(f"Ollama is not available: {message}")
         return message
@@ -183,9 +196,9 @@ Provide a clear, well-formatted response that directly addresses the user's requ
 
 Provide a clear, well-formatted response that directly addresses the user's request."""
 
-    logger.info(f"Preparing to send request to Ollama API with model: {MODEL_NAME}")
+    logger.info(f"Preparing to send request to Ollama API with model: {model}")
     data = {
-        "model": MODEL_NAME,
+        "model": model,
         "prompt": prompt,
         "stream": False,
         "options": {
@@ -227,12 +240,12 @@ Provide a clear, well-formatted response that directly addresses the user's requ
         return f"Error analyzing content: {str(e)}. Please make sure Ollama is running and properly configured."
 
 # Synchronous wrapper for Streamlit compatibility
-def sync_parse_with_deepseek(pdf_paths, description):
+def sync_parse_with_deepseek(pdf_paths, description, model=None):
     """Synchronous wrapper for async parse function"""
     try:
         logger.info("Starting sync_parse_with_deepseek")
         logger.info(f"Description: {description[:100]}...")  # Log first 100 chars of description
-        result = asyncio.run(parse_with_ollama(pdf_paths, description))
+        result = asyncio.run(parse_with_ollama(pdf_paths, description, model))
         logger.info("Successfully completed sync_parse_with_deepseek")
         logger.info(f"Result: {result[:100]}...")  # Log first 100 chars of result
         return result

@@ -1,6 +1,6 @@
 import streamlit as st
 from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf
-from parse import sync_parse_with_deepseek as parse_with_ollama, get_ollama_status
+from parse import sync_parse_with_deepseek as parse_with_ollama, get_ollama_status, get_available_models
 import time
 import os
 import base64
@@ -263,6 +263,13 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
+    # Model picker: list locally installed Ollama models
+    available_models = get_available_models()
+    if available_models:
+        st.selectbox("AI Model", available_models, key="ollama_model")
+    else:
+        st.warning("No Ollama models found. Is Ollama running?")
+
     st.markdown("""
     <div class="card">
         <h3>About</h3>
@@ -442,7 +449,7 @@ def scraping_section():
     """, unsafe_allow_html=True)
     
     # Show Ollama status
-    ollama_status = get_ollama_status()
+    ollama_status = get_ollama_status(st.session_state.get('ollama_model'))
     if not ollama_status["available"]:
         st.warning("⚠️ " + ollama_status["message"])
     else:
@@ -561,7 +568,7 @@ def scraping_section():
                 else:
                     try:
                         with st.spinner("Extracting text and analyzing..."):
-                            result = parse_with_ollama(selected_pdfs, pdf_prompt)
+                            result = parse_with_ollama(selected_pdfs, pdf_prompt, st.session_state.get('ollama_model'))
                         st.markdown("#### Result")
                         st.markdown(result)
                     except Exception as e:
@@ -578,7 +585,7 @@ def scraping_section():
             try:
                 with st.spinner("Testing LLM connection..."):
                     st.write("Debug: Testing LLM connection...")
-                    test_result = parse_with_ollama([], "Please respond with 'LLM is working' if you can read this message.")
+                    test_result = parse_with_ollama([], "Please respond with 'LLM is working' if you can read this message.", st.session_state.get('ollama_model'))
                     st.write("Debug: LLM Test Response:", test_result)
                     if "LLM is working" in test_result:
                         st.success("✅ LLM is working correctly!")
@@ -647,7 +654,7 @@ User's instructions: {llm_prompt}"""
                             st.write("Debug: Sending to LLM...")
                             
                             # Process with LLM
-                            result = parse_with_ollama([], full_prompt)
+                            result = parse_with_ollama([], full_prompt, st.session_state.get('ollama_model'))
                             
                             if result and not result.startswith("Error:"):
                                 st.markdown("### Processed Result")
