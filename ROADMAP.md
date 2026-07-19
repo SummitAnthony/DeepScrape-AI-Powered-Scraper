@@ -2,11 +2,13 @@
 
 One item per iteration. Implement minimally, verify, commit, push, check off.
 
-## Queue (priority order) — Round 5: automation & integrations (TDD + update README Features every iteration)
+## Queue (priority order)
 
-- [ ] **CLI mode**: `cli.py` with argparse subcommands (`scrape`, `pdfs`, `extract`) reusing the pipeline, printing JSON. TDD: argument parsing + command dispatch tests.
+(empty — rounds 1–5 fully shipped)
 
 ## Done
+
+- [x] **CLI mode**: cli.py scrape/pdfs/extract subcommands, JSON to stdout (9 tests) — `91f0889`
 
 - [x] **Webhook notifications**: Slack/Discord/generic alerts wired into watch runner (8 tests) — `7675b64`
 - [x] **Scheduled watch runner**: cron-friendly batch checker with on_change hook (5 tests) — `78c45ba`
