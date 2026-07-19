@@ -148,11 +148,58 @@ async def extract_text_from_pdf(pdf_path):
         logger.error(f"Error extracting text from PDF {pdf_path}: {str(e)}")
         return ""
 
-async def process_pdf_files(pdf_paths):
-    """Process multiple PDF files concurrently"""
-    tasks = [extract_text_from_pdf(path) for path in pdf_paths]
-    results = await asyncio.gather(*tasks)
-    return results
+def _extract_csv(path):
+    import csv
+    rows = []
+    with open(path, newline='', encoding='utf-8', errors='replace') as f:
+        for row in csv.reader(f):
+            rows.append(", ".join(row))
+    return clean_text("\n".join(rows))
+
+def _extract_docx(path):
+    from docx import Document
+    doc = Document(path)
+    return clean_text("\n".join(p.text for p in doc.paragraphs))
+
+def _extract_xlsx(path):
+    from openpyxl import load_workbook
+    wb = load_workbook(path, read_only=True, data_only=True)
+    lines = []
+    for ws in wb.worksheets:
+        lines.append(f"# {ws.title}")
+        for row in ws.iter_rows(values_only=True):
+            lines.append(", ".join("" if c is None else str(c) for c in row))
+    wb.close()
+    return clean_text("\n".join(lines))
+
+def extract_text_from_file(path):
+    """Extract text from a supported document (pdf/docx/xlsx/csv). Unknown/missing -> ''."""
+    if not os.path.exists(path):
+        logger.error(f"File not found: {path}")
+        return ""
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == ".pdf":
+            return asyncio.run(extract_text_from_pdf(path))
+        if ext == ".csv":
+            return _extract_csv(path)
+        if ext == ".docx":
+            return _extract_docx(path)
+        if ext == ".xlsx":
+            return _extract_xlsx(path)
+    except Exception as e:
+        logger.error(f"Error extracting text from {path}: {str(e)}")
+        return ""
+    logger.warning(f"Unsupported file type for text extraction: {ext}")
+    return ""
+
+async def process_pdf_files(paths):
+    """Extract text from multiple documents concurrently (pdf/docx/xlsx/csv)."""
+    async def _one(path):
+        if os.path.splitext(path)[1].lower() == ".pdf":
+            return await extract_text_from_pdf(path)
+        return await asyncio.to_thread(extract_text_from_file, path)
+    return await asyncio.gather(*[_one(p) for p in paths])
 
 async def _generate(prompt, model):
     """Single Ollama generate call. Returns response text (or an error string)."""

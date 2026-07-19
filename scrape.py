@@ -141,17 +141,36 @@ def get_absolute_url(base_url, href):
         logger.error(f"Error getting absolute URL: {str(e)}")
         return None
 
+# Document extensions we harvest, mapped to a type label
+DOCUMENT_EXTENSIONS = {
+    '.pdf': 'pdf',
+    '.docx': 'docx',
+    '.xlsx': 'xlsx',
+    '.csv': 'csv',
+}
+
+def classify_download_link(href):
+    """Return the document type ('pdf'/'docx'/'xlsx'/'csv') for a link, or None."""
+    if not href:
+        return None
+    path = urlparse(href).path.lower()
+    for ext, label in DOCUMENT_EXTENSIONS.items():
+        if path.endswith(ext):
+            return label
+    return None
+
 def is_download_link(href):
-    """Check if the link is a download link"""
+    """Check if the link is a download link (PDF or other harvestable document)"""
     if not href:
         return False
-    
+
     try:
+        if classify_download_link(href):
+            return True
         download_patterns = [
             r'download_file\.php',
             r'download\.php',
             r'get_file\.php',
-            r'\.pdf$',
             r'/pdf/',
             r'download.*\.pdf',
             r'paper.*\.pdf',
