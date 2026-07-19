@@ -4,7 +4,6 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 2 (TDD: write tests first, make them pass, then ship)
 
-- [ ] **Test foundation + CI**: pytest suite for existing pure functions (`is_download_link`, `get_absolute_url`, `get_filename_from_url`, cache put/get, `records_to_csv`, `scraped_data_to_text`, structured-extraction JSON parsing) + GitHub Actions workflow running it on push.
 - [ ] **RAG chat over PDFs**: chunk downloaded PDF text, embed via Ollama `/api/embeddings`, store vectors in SQLite, retrieve top-k relevant chunks for a question, answer with source citations. Chat-style multi-turn UI. TDD: chunking/similarity/store tests first.
 - [ ] **Playwright migration**: replace Selenium + chromedriver.exe dance with Playwright (auto-managed browsers). Keep requests-first + cache pipeline. TDD: pipeline fallback logic tests with mocked fetchers.
 - [ ] **Smart crawl**: LLM ranks candidate links by relevance to the user's stated goal before following; goal input in UI. TDD: link-ranking prompt parsing + queue-priority tests.
@@ -12,6 +11,7 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Done
 
+- [x] **Test foundation + CI**: 25 pytest tests (red→green) + GitHub Actions on push — `bff173f`
 - [x] **Cleanup & README**: debug lines removed, README covers all new features, pymupdf added — `ac64dfc`
 
 - [x] **Caching**: disk cache for pages (URL hash, 1h TTL), verified roundtrip — `688ef91`
