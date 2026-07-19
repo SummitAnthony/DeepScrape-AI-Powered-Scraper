@@ -4,12 +4,12 @@ One item per iteration. Implement minimally, verify, commit, push, check off.
 
 ## Queue (priority order) — Round 2 (TDD: write tests first, make them pass, then ship)
 
-- [ ] **Playwright migration**: replace Selenium + chromedriver.exe dance with Playwright (auto-managed browsers). Keep requests-first + cache pipeline. TDD: pipeline fallback logic tests with mocked fetchers.
 - [ ] **Smart crawl**: LLM ranks candidate links by relevance to the user's stated goal before following; goal input in UI. TDD: link-ranking prompt parsing + queue-priority tests.
 - [ ] **Watch mode**: monitor a URL on interval, diff text content between runs, show what changed. TDD: diff/normalize tests first.
 
 ## Done
 
+- [x] **Playwright migration**: Selenium fully removed, live fetch verified (6 tests) — `3da8eb9`
 - [x] **RAG chat over PDFs**: SQLite vector store + Ollama embeddings + cited streaming chat (12 tests) — `c70ffab`
 - [x] **Test foundation + CI**: 25 pytest tests (red→green) + GitHub Actions on push — `bff173f`
 - [x] **Cleanup & README**: debug lines removed, README covers all new features, pymupdf added — `ac64dfc`
