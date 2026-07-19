@@ -6,6 +6,7 @@ Add to cron/Task Scheduler to monitor pages on a schedule.
 import logging
 
 from watch import WatchStore, check_url, DB_PATH
+from notify import load_webhook_url, notify_webhook, format_change_message, WEBHOOK_ENV
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -43,11 +44,21 @@ def run_batch(db_path=DB_PATH, on_change=None):
 
 
 def main():
-    summary = run_batch()
+    # If a webhook is configured, alert on every detected change.
+    webhook_url = load_webhook_url()
+
+    def on_change(url, result):
+        if webhook_url:
+            sent = notify_webhook(webhook_url, format_change_message(url, result))
+            logger.info(f"Webhook {'sent' if sent else 'FAILED'} for {url}")
+
+    summary = run_batch(on_change=on_change)
     print(f"Checked {summary['checked']} URLs — {summary['changed']} changed, {summary['errors']} errors")
     for change in summary["changes"]:
         r = change["result"]
         print(f"  🔔 {change['url']}: +{len(r['added'])} / -{len(r['removed'])} lines")
+    if summary["changed"] and not webhook_url:
+        print(f"  (set {WEBHOOK_ENV} to get webhook alerts)")
 
 
 if __name__ == "__main__":
