@@ -6,6 +6,7 @@ from parse import (
     get_available_models,
     sync_parse_large_content,
     sync_extract_structured,
+    sync_extract_tournament,
     stream_generate,
     sync_extract_pdf_text,
     MAX_CONTENT_CHARS,
@@ -843,6 +844,10 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                 placeholder="name, price, date",
                 key="extract_fields"
             )
+            tournament = st.checkbox(
+                "High-accuracy mode (tournament: extract 3× and majority-vote)",
+                help="Runs the extraction three times and keeps only records that most runs agree on. Slower but more reliable."
+            )
             if st.form_submit_button("Extract as Table"):
                 if not fields_input.strip():
                     st.error("Please enter at least one field")
@@ -850,12 +855,13 @@ Provide a clear, well-formatted response that directly addresses the user's requ
                     st.error(ollama_status["message"])
                 else:
                     fields = [f.strip() for f in fields_input.split(',') if f.strip()]
+                    content_text = scraped_data_to_text(st.session_state.scraped_data)
+                    model = st.session_state.get('ollama_model')
                     with st.spinner("Extracting structured data..."):
-                        records, err = sync_extract_structured(
-                            scraped_data_to_text(st.session_state.scraped_data),
-                            fields,
-                            st.session_state.get('ollama_model')
-                        )
+                        if tournament:
+                            records, err = sync_extract_tournament(content_text, fields, model)
+                        else:
+                            records, err = sync_extract_structured(content_text, fields, model)
                     if err:
                         st.error(err)
                     elif not records:

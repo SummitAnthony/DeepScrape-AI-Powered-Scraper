@@ -298,6 +298,45 @@ def _parse_json_records(result):
         return None, "Model did not return a JSON array"
     return records, None
 
+def _record_key(record):
+    """Order/case/whitespace-insensitive identity key for a record dict."""
+    return tuple(sorted(
+        (str(k).strip().lower(), " ".join(str(v).strip().lower().split()))
+        for k, v in record.items()
+    ))
+
+def merge_candidate_runs(runs):
+    """Merge several extraction runs by majority vote: keep records that appear in a
+    majority of runs. Field values come from the record's first occurrence."""
+    if not runs:
+        return []
+    threshold = (len(runs) // 2) + 1
+    votes = {}       # key -> number of runs containing it
+    first_seen = {}  # key -> the record dict
+    for run in runs:
+        keys_this_run = set()
+        for record in run:
+            if not isinstance(record, dict):
+                continue
+            key = _record_key(record)
+            if key not in first_seen:
+                first_seen[key] = record
+            keys_this_run.add(key)
+        for key in keys_this_run:
+            votes[key] = votes.get(key, 0) + 1
+    return [first_seen[key] for key, count in votes.items() if count >= threshold]
+
+def sync_extract_tournament(content, fields, model=None, rounds=3):
+    """Run structured extraction `rounds` times and merge by majority vote for accuracy.
+    Returns (records, error)."""
+    runs = []
+    for _ in range(rounds):
+        records, error = sync_extract_structured(content, fields, model)
+        if error:
+            return None, error
+        runs.append(records)
+    return merge_candidate_runs(runs), None
+
 def sync_extract_structured(content, fields, model=None):
     """Extract records with the given fields from content as JSON.
     Returns (records, error) — one of the two is None."""
