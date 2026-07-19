@@ -2,11 +2,13 @@
 
 One item per iteration. Implement minimally, verify, commit, push, check off.
 
-## Queue (priority order) — Round 3 (TDD + update README Features section every iteration)
+## Queue (priority order)
 
-- [ ] **API mode**: FastAPI app (`api.py`) exposing /scrape, /pdfs, /extract endpoints reusing the same pipeline. TDD: endpoint tests via TestClient.
+(empty — rounds 1, 2, and 3 fully shipped)
 
 ## Done
+
+- [x] **API mode**: FastAPI /scrape, /pdfs, /extract endpoints (6 tests) — `f3e44c8`
 
 - [x] **Scrape-history dashboard**: SQLite job log + sidebar re-run (5 tests) — `41cff69`
 - [x] **More file types**: DOCX/XLSX/CSV harvest + extraction, fed to AI/RAG (15 tests) — `c761e21`
