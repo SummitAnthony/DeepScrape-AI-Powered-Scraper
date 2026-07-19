@@ -346,6 +346,46 @@ def crawl_website(start_url, max_depth=1, max_pages=20):
     logger.info(f"Crawl done: {len(pages)} pages, {len(pdf_links)} PDF links")
     return {'pages': pages, 'pdf_links': list(pdf_links)}
 
+def parse_sitemap_xml(xml_text):
+    """Parse sitemap XML. Returns (page_urls, sub_sitemap_urls).
+    A <urlset> yields page URLs; a <sitemapindex> yields nested sitemap URLs."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return [], []
+    # Strip namespace from tags for simpler matching
+    def localname(tag):
+        return tag.rsplit('}', 1)[-1]
+    urls, subs = [], []
+    is_index = localname(root.tag) == 'sitemapindex'
+    for loc in root.iter():
+        if localname(loc.tag) == 'loc' and loc.text:
+            (subs if is_index else urls).append(loc.text.strip())
+    return urls, subs
+
+def fetch_sitemap_urls(url, max_urls=2000, _depth=0):
+    """Discover page URLs from a site's sitemap. Accepts a sitemap URL or any page URL
+    (falls back to <domain>/sitemap.xml). Follows sitemap-index nesting."""
+    if _depth == 0 and not url.rstrip('/').endswith('.xml'):
+        parsed = urlparse(url)
+        url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
+
+    if _depth > 5:
+        return []
+
+    xml_text = fetch_html(url)
+    if not xml_text:
+        return []
+
+    page_urls, sub_sitemaps = parse_sitemap_xml(xml_text)
+    collected = list(page_urls)
+    for sub in sub_sitemaps:
+        if len(collected) >= max_urls:
+            break
+        collected.extend(fetch_sitemap_urls(sub, max_urls, _depth + 1))
+    return collected[:max_urls]
+
 def extract_candidate_links(html, base_url, domain):
     """Extract same-domain links as (url, link_text) pairs, deduped, fragments stripped."""
     soup = BeautifulSoup(html, 'html.parser')

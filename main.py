@@ -1,5 +1,5 @@
 import streamlit as st
-from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf, crawl_website, smart_crawl, download_pdfs_concurrent
+from scrape import scrape_website, download_pdf, scrape_website_content, scrape_for_pdf, crawl_website, smart_crawl, download_pdfs_concurrent, fetch_sitemap_urls, is_download_link
 from parse import (
     sync_parse_with_deepseek as parse_with_ollama,
     get_ollama_status,
@@ -500,6 +500,7 @@ def scraping_section():
     # Crawl depth (PDF mode): 0 = this page only, 1+ = follow same-site links
     crawl_depth = 0
     crawl_goal = ""
+    use_sitemap = False
     if scraping_mode == "Scrape for PDF":
         crawl_depth = st.slider("Crawl depth (follow same-site links)", 0, 3, 0,
                                 help="0 scans only this page. 1+ also crawls linked pages on the same domain (respects robots.txt, max 20 pages).")
@@ -509,6 +510,8 @@ def scraping_section():
                 placeholder="e.g. find 2024 exam papers",
                 help="With a goal, the AI ranks links on each page and only follows the most relevant ones."
             )
+        use_sitemap = st.checkbox("Discover PDFs via sitemap.xml",
+                                  help="Reads the site's sitemap.xml (fast, whole-site) instead of crawling pages.")
     
     if st.button("Start Scraping"):
         if not url:
@@ -539,7 +542,11 @@ def scraping_section():
                             for line in result["removed"][:50]:
                                 st.markdown(f"- {line}")
                 else:  # Scrape for PDF
-                    if crawl_depth > 0:
+                    if use_sitemap:
+                        sitemap_urls = fetch_sitemap_urls(url)
+                        pdf_links = [u for u in sitemap_urls if is_download_link(u)]
+                        st.info(f"Sitemap listed {len(sitemap_urls)} URLs")
+                    elif crawl_depth > 0:
                         if crawl_goal.strip():
                             crawl_result = smart_crawl(url, crawl_goal, max_depth=crawl_depth,
                                                        model=st.session_state.get('ollama_model'))
